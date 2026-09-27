@@ -1,0 +1,8 @@
+{
+  "name": "DS IA",
+  "description": "DS IA - Private, local AI chat interface powered by Ollama",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
