@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import { createServer as createViteServer } from 'vite'
-import { GoogleGenAI } from '@google/genai'
 
 const app = express()
 const port = Number(process.env.PORT || 3000)
@@ -12,6 +11,15 @@ const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434'
 const model = process.env.OLLAMA_MODEL || 'hf.co/HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive:Q4_K_M'
 const root = path.dirname(fileURLToPath(import.meta.url))
 const isProduction = process.env.NODE_ENV === 'production'
+
+// Dynamically import @google/genai if available (prevents ERR_MODULE_NOT_FOUND on pure local Ollama)
+let GoogleGenAI = null
+try {
+  const genaiModule = await import('@google/genai')
+  GoogleGenAI = genaiModule.GoogleGenAI
+} catch {
+  // @google/genai is optional when running local Ollama only
+}
 
 // Load .env if present and needed
 try {
@@ -38,7 +46,7 @@ const geminiApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !=
   ? process.env.GEMINI_API_KEY
   : null
 
-const ai = geminiApiKey
+const ai = (geminiApiKey && GoogleGenAI)
   ? new GoogleGenAI({
       apiKey: geminiApiKey,
       httpOptions: {
@@ -66,7 +74,7 @@ function finalAnswer(text) {
 async function pingOllama() {
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 1200)
+    const timer = setTimeout(() => controller.abort(), 1000)
     const res = await fetch(`${ollamaUrl}/api/tags`, { signal: controller.signal })
     clearTimeout(timer)
     return res.ok
@@ -84,7 +92,7 @@ app.get('/api/health', async (_request, response) => {
   }
 
   if (ai) {
-    return response.status(200).json({ connected: true, provider: 'gemini', model: 'gemini-3.8-flash' })
+    return response.status(200).json({ connected: true, provider: 'gemini', model: 'gemini-3.1-flash-lite' })
   }
 
   return response.status(503).json({ connected: false, model })
@@ -93,7 +101,7 @@ app.get('/api/health', async (_request, response) => {
 app.get('/api/models', async (_request, response) => {
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 1200)
+    const timer = setTimeout(() => controller.abort(), 1000)
     const ollamaResponse = await fetch(`${ollamaUrl}/api/tags`, { signal: controller.signal })
     clearTimeout(timer)
     if (ollamaResponse.ok) {
@@ -140,7 +148,7 @@ app.get('/api/models', async (_request, response) => {
 })
 
 async function callGemini(selectedModel, prompt, filteredHistory, activeSystemPrompt) {
-  const modelToUse = selectedModel && selectedModel.startsWith('gemini-') ? selectedModel : 'gemini-3.8-flash'
+  const modelToUse = selectedModel && selectedModel.startsWith('gemini-') ? selectedModel : 'gemini-3.1-flash-lite'
   const contents = []
 
   for (const msg of filteredHistory.slice(-14)) {
@@ -179,10 +187,12 @@ async function callGemini(selectedModel, prompt, filteredHistory, activeSystemPr
     config.systemInstruction = activeSystemPrompt
   }
 
-  // Attempt with requested model, fallback if high demand (503/429)
+  // Resilient models list
   const modelsToTry = [modelToUse]
-  if (modelToUse === 'gemini-3.8-flash') {
+  if (modelToUse !== 'gemini-3.1-flash-lite') {
     modelsToTry.push('gemini-3.1-flash-lite')
+  } else {
+    modelsToTry.push('gemini-3.8-flash')
   }
 
   let lastError = null
@@ -199,7 +209,7 @@ async function callGemini(selectedModel, prompt, filteredHistory, activeSystemPr
       }
     } catch (err) {
       lastError = err
-      console.warn(`Model ${currentModel} failed, trying fallback if available:`, err?.message || err)
+      console.warn(`Model ${currentModel} failed, trying fallback:`, err?.message || err)
     }
   }
 
@@ -254,6 +264,7 @@ app.post('/api/chat', async (request, response) => {
           temperature: 0.85,
         },
       }),
+      signal: AbortSignal.timeout(60000),
     })
 
     if (chatResponse.ok) {
@@ -294,6 +305,7 @@ app.post('/api/chat', async (request, response) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(generatePayload),
+      signal: AbortSignal.timeout(60000),
     })
 
     if (ollamaResponse.ok) {
@@ -304,7 +316,7 @@ app.post('/api/chat', async (request, response) => {
     // Ollama is offline: fallback to Gemini if available
     if (ai) {
       try {
-        const geminiResult = await callGemini('gemini-3.8-flash', prompt, filteredHistory, activeSystemPrompt)
+        const geminiResult = await callGemini('gemini-3.1-flash-lite', prompt, filteredHistory, activeSystemPrompt)
         return response.json(geminiResult)
       } catch (geminiError) {
         console.error('Gemini fallback error:', geminiError)
@@ -320,7 +332,7 @@ app.post('/api/chat', async (request, response) => {
   // Fallback to Gemini if reached here and ai is available
   if (ai) {
     try {
-      const geminiResult = await callGemini('gemini-3.8-flash', prompt, filteredHistory, activeSystemPrompt)
+      const geminiResult = await callGemini('gemini-3.1-flash-lite', prompt, filteredHistory, activeSystemPrompt)
       return response.json(geminiResult)
     } catch (geminiError) {
       return response.status(500).json({ error: geminiError instanceof Error ? geminiError.message : 'Erro ao processar.' })
@@ -328,7 +340,7 @@ app.post('/api/chat', async (request, response) => {
   }
 
   return response.status(503).json({
-    error: `Serviço de IA indisponível. Verifique o Ollama ou as configurações de API.`,
+    error: `Serviço de IA indisponível. Verifique o Ollama local ou a chave de API.`,
   })
 })
 
@@ -346,8 +358,8 @@ if (!isProduction) {
 
 app.listen(port, host, () => {
   console.log(`Local chat server listening on http://${host}:${port}`)
-  console.log(`Using model: ${model}`)
+  console.log(`Using default local model: ${model}`)
   if (ai) {
-    console.log(`Gemini API configured: using gemini-3.8-flash`)
+    console.log(`Gemini cloud engine active`)
   }
 })

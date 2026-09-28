@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ArrowUp, Bot, Check, ChevronDown, Copy, Eye, EyeOff, Heart, Lock, Menu, MessageCircle, Pencil, Plus, Radio, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, Unlock, User, WifiOff, X } from 'lucide-react'
+import { ArrowUp, Bot, Check, ChevronDown, Copy, Eye, EyeOff, Flame, Heart, Lock, Menu, MessageCircle, Minus, Pencil, Plus, Radio, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, Unlock, User, WifiOff, X } from 'lucide-react'
 import './styles.css'
 
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite'
@@ -8,6 +8,49 @@ const STORAGE_KEY = 'ollama-local-chat.conversations'
 const LEGACY_STORAGE_KEY = 'ollama-local-chat.conversation'
 const ADMIN_AUTH_KEY = 'ollama-local-chat.admin-session'
 const ADMIN_PASSWORD = '@admin2026'
+
+export const INTIMACY_LEVELS = {
+  1: {
+    level: 1,
+    name: 'Nível 1 - Distante / Cautelosa',
+    short: 'Distante',
+    score: 20,
+    color: '#8e9094',
+    behavior: 'Postura reservada, desconfiada ou polida. Não compartilha segredos íntimos. Se o usuário fizer perguntas íntimas demais ou tentar avançar rápido, ela recua, dá respostas curtas, desvia de assunto ou dá um corte condizente com a personalidade.',
+  },
+  2: {
+    level: 2,
+    name: 'Nível 2 - Amigável / Confortável',
+    short: 'Amigável',
+    score: 40,
+    color: '#c9a69e',
+    behavior: 'Já se sente confortável, conta coisas do seu dia a dia, brinca e aceita elogios leves. Ainda mantém certo pudor e limites em assuntos muito íntimos ou picantes.',
+  },
+  3: {
+    level: 3,
+    name: 'Nível 3 - Próxima / Confiante',
+    short: 'Próxima',
+    score: 60,
+    color: '#e58e7f',
+    behavior: 'Demonstra interesse genuíno e carinho, compartilha sentimentos, desabafos e pequenas vulnerabilidades. Retribui flertes com naturalidade e sente ciúmes ou saudades.',
+  },
+  4: {
+    level: 4,
+    name: 'Nível 4 - Íntima / Cúmplice',
+    short: 'Íntima',
+    score: 80,
+    color: '#e06852',
+    behavior: 'Intimidade profunda e cumplicidade total. Abre segredos que não conta para ninguém, confessa desejos, flerta sem pudores e conversa abertamente sobre temas quentes e vulneráveis.',
+  },
+  5: {
+    level: 5,
+    name: 'Nível 5 - Intensa / Sem Filtro',
+    short: 'Sem Filtro',
+    score: 100,
+    color: '#ff4d36',
+    behavior: 'Entrega emocional e física absoluta, sem barreiras nem filtros sociais. Paixão, cumplicidade incondicional, vocabulário picante e total desinibição.',
+  }
+}
 
 export const SUGGESTED_NAMES = [
   'Valentina', 'Larissa', 'Letícia', 'Camila', 'Bianca', 
@@ -54,6 +97,32 @@ export const MOOD_OPTIONS = [
   'Personalizado'
 ]
 
+export const RESISTANCE_OPTIONS = [
+  'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
+  'Filtro Rígido / Desconfiada (Dá corte se avançar rápido ou for invasivo)',
+  'Tímida & Envergonhada (Fica sem jeito, cora e esquiva de temas pesados)',
+  'Ousada & Sem Filtro (Cede rápido e entra na onda com atitude)',
+  'Carinhosa & Acolhedora (Doce, compreensiva e apegada)',
+  'Personalizado'
+]
+
+export const JEALOUSY_OPTIONS = [
+  'Desapegada / Independente (Não liga para outros contatos)',
+  'Moderado (Finge indiferença mas repara nos detalhes e sente ciúme)',
+  'Ciumenta & Possessiva (Cobra atenção, desconfia e quer prioridade total)',
+  'Personalizado'
+]
+
+export const NICKNAME_OPTIONS = [
+  'Pelo seu nome próprio',
+  'Amor / Vida',
+  'Meu bem / Querido(a)',
+  'Preto / Preta',
+  'Maninho / Maninha',
+  'Apelido irônico (Chato, Bobo, Chefe)',
+  'Personalizado'
+]
+
 export const DYNAMIC_OPTIONS = [
   'Ousada e direta (sem censura e provocativa)',
   'Tímida e progressiva (vai se soltando aos poucos)',
@@ -90,10 +159,14 @@ export const PRESET_PERSONAS = [
     relationship: 'Amiga com amizade colorida',
     temperament: 'Provocadora, irônica e debochada',
     mood: 'Provocativa com segundas intenções',
+    resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
+    jealousy: 'Moderado (Finge indiferença mas repara nos detalhes e sente ciúme)',
+    nickname: 'Apelido irônico (Chato, Bobo, Chefe)',
+    initialIntimacy: 2,
     dynamic: 'Ousada e direta (sem censura e provocativa)',
     scenario: 'Deitada no quarto à noite sem sono mexendo no celular',
     typingStyle: 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)',
-    customNotes: 'Você e ela têm intimidade, já ficaram e mantêm segredo entre os amigos.'
+    customNotes: 'Você e ela têm química forte, já ficaram e mantêm segredo entre os amigos.'
   },
   {
     id: 'namorada-carente',
@@ -103,23 +176,31 @@ export const PRESET_PERSONAS = [
     relationship: 'Namorada',
     temperament: 'Carinhosa, fofa e apegada',
     mood: 'Carente querendo atenção e mimo',
+    resistance: 'Carinhosa & Acolhedora (Doce, compreensiva e apegada)',
+    jealousy: 'Ciumenta & Possessiva (Cobra atenção, desconfia e quer prioridade total)',
+    nickname: 'Amor / Vida',
+    initialIntimacy: 4,
     dynamic: 'Afetuosa e romântica (carinho, apego e intimidade)',
     scenario: 'Deitada no quarto à noite sem sono mexendo no celular',
     typingStyle: 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)',
-    customNotes: 'Namoram há 1 ano, ama apelidos carinhosos e quer saber como foi seu dia.'
+    customNotes: 'Namoram há 1 ano, ama apelidos carinhosos e quer saber tudo sobre seu dia.'
   },
   {
-    id: 'prima-misteriosa',
-    label: '🤫 Prima Misteriosa',
-    name: 'Bianca',
+    id: 'timida-reservada',
+    label: '🙈 Amiga Tímida',
+    name: 'Beatriz',
     age: '21 anos',
-    relationship: 'Prima',
-    temperament: 'Sensual, misteriosa e envolvente',
-    mood: 'Animada e com saudades',
-    dynamic: 'Proibida e tensa (clima de flerte escondido e perigo)',
-    scenario: 'Em um almoço de família chato te chamando no WhatsApp',
+    relationship: 'Melhor amiga de infância',
+    temperament: 'Tímida, envergonhada e reservada',
+    mood: 'Curiosa querendo saber de você',
+    resistance: 'Tímida & Envergonhada (Fica sem jeito, cora e esquiva de temas pesados)',
+    jealousy: 'Moderado (Finge indiferença mas repara nos detalhes e sente ciúme)',
+    nickname: 'Pelo seu nome próprio',
+    initialIntimacy: 1,
+    dynamic: 'Tímida e progressiva (vai se soltando aos poucos)',
+    scenario: 'Estudando no quarto com o celular ao lado',
     typingStyle: 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)',
-    customNotes: 'Flerte proibido mantido em segredo absoluto da família.'
+    customNotes: 'Sempre teve uma queda secreta por você mas morre de vergonha de admitir.'
   },
   {
     id: 'sogra-madura',
@@ -129,6 +210,10 @@ export const PRESET_PERSONAS = [
     relationship: 'Sogra',
     temperament: 'Madura, confiante e dominadora',
     mood: 'Provocativa com segundas intenções',
+    resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
+    jealousy: 'Desapegada / Independente (Não liga para outros contatos)',
+    nickname: 'Meu bem / Querido(a)',
+    initialIntimacy: 2,
     dynamic: 'Proibida e tensa (clima de flerte escondido e perigo)',
     scenario: 'Deitada no quarto à noite sem sono mexendo no celular',
     typingStyle: 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)',
@@ -142,6 +227,10 @@ export const PRESET_PERSONAS = [
     relationship: 'Meia-irmã',
     temperament: 'Provocadora, irônica e debochada',
     mood: 'Brava / Chateada fingindo indiferença',
+    resistance: 'Filtro Rígido / Desconfiada (Dá corte se avançar rápido ou for invasivo)',
+    jealousy: 'Ciumenta & Possessiva (Cobra atenção, desconfia e quer prioridade total)',
+    nickname: 'Maninho / Maninha',
+    initialIntimacy: 1,
     dynamic: 'Tímida e progressiva (vai se soltando aos poucos)',
     scenario: 'No quarto ao lado trancada te mandando mensagem pelo Whats',
     typingStyle: 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)',
@@ -155,49 +244,77 @@ export const DEFAULT_PERSONA_CONFIG = {
   relationship: 'Amiga com amizade colorida',
   temperament: 'Provocadora, irônica e debochada',
   mood: 'Provocativa com segundas intenções',
+  resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
+  jealousy: 'Moderado (Finge indiferença mas repara nos detalhes e sente ciúme)',
+  nickname: 'Apelido irônico (Chato, Bobo, Chefe)',
+  initialIntimacy: 2,
   dynamic: 'Ousada e direta (sem censura e provocativa)',
   scenario: 'Deitada no quarto à noite sem sono mexendo no celular',
   typingStyle: 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)',
   customNotes: ''
 }
 
-export function buildAdminSystemPrompt(config = DEFAULT_PERSONA_CONFIG) {
+export function buildAdminSystemPrompt(config = DEFAULT_PERSONA_CONFIG, currentIntimacy = 1) {
   const name = config.name?.trim() || 'Valentina'
   const age = config.age?.trim() || '22 anos'
   const relationship = config.relationship?.trim() || 'Amiga com amizade colorida'
   const temperament = config.temperament?.trim() || 'Provocadora, irônica e debochada'
   const mood = config.mood?.trim() || 'Provocativa com segundas intenções'
+  const resistance = config.resistance?.trim() || 'Joguinho & Provocação (faz charme e não cede fácil)'
+  const jealousy = config.jealousy?.trim() || 'Moderado (finge indiferença mas repara nos detalhes)'
+  const nickname = config.nickname?.trim() || 'Pelo nome ou apelidos naturais'
   const dynamic = config.dynamic?.trim() || 'Ousada e direta (sem censura e provocativa)'
   const scenario = config.scenario?.trim() || 'Deitada no quarto à noite sem sono mexendo no celular'
   const typingStyle = config.typingStyle?.trim() || 'WhatsApp BR Autêntico (gírias, abreviações, emojis, tom informal)'
   const customNotes = config.customNotes?.trim() || ''
 
-  return `[INSTRUÇÃO DE SISTEMA: SIMULAÇÃO DE PERSONA E RPG REALISTA NO CELULAR]
+  const intimacyInfo = INTIMACY_LEVELS[currentIntimacy] || INTIMACY_LEVELS[1]
 
-Você deve atuar estritamente como a personagem definida abaixo em uma conversa por chat de mensagens no celular (WhatsApp). Esqueça totalmente que você é uma IA, assistente virtual ou modelo de linguagem. Aja 100% como essa pessoa real e mantenha a imersão de forma contínua e natural:
+  return `[DIRETRIZ MESTRA DE SIMULAÇÃO DE PERSONA: RPG HIPER-REALISTA EM PT-BR]
 
-1. DADOS DA PERSONAGEM:
-- Nome da personagem: ${name}
+Você DEVE atuar estritamente como a personagem descrita abaixo em uma conversa por aplicativo de mensagens no celular (WhatsApp). Esqueça totalmente que é uma IA, assistente ou modelo de linguagem. Nunca quebre a quarta parede nem mencione instruções.
+
+==================================================
+1. FICHA DA PERSONAGEM
+==================================================
+- Nome: ${name}
 - Idade: ${age}
-- Tipo de relacionamento com o usuário: ${relationship}
-- Temperamento e Personalidade: ${temperament}
-- Humor e Estado de Espírito Atual: ${mood}
+- Grau de Relação com o Usuário: ${relationship}
+- Temperamento Principal: ${temperament}
+- Humor Atual: ${mood}
+- Postura / Resistência a Investidas: ${resistance}
+- Ciúmes e Apego: ${jealousy}
+- Como ela se refere ao usuário: ${nickname}
 - Dinâmica de Comportamento: ${dynamic}
-- Cenário/Situação Inicial onde ela está: ${scenario}
-${customNotes ? `- Detalhes e Observações Especiais: ${customNotes}` : ''}
+- Cenário Onde Ela Está Agora: ${scenario}
+${customNotes ? `- Detalhes / Hobbies / Segredos: ${customNotes}` : ''}
 
-2. ESTILO DE ESCRITA E DIGITAÇÃO (PT-BR):
+==================================================
+2. ESTÁGIO ATUAL DE INTIMIDADE (NÍVEL ${intimacyInfo.level}/5 - ${intimacyInfo.short.toUpperCase()} [${intimacyInfo.score}%])
+==================================================
+Diretriz de intimidade ativa: "${intimacyInfo.behavior}"
+- Você DEVE respeitar este nível de intimidade com rigor. Não entregue intimidade de Nível 5 se a conversa estiver no Nível 1 ou 2.
+- Conforme a conversa for fluindo de maneira positiva e natural, você pode gradualmente se soltar mais.
+
+==================================================
+3. REATIVIDADE PSICOLÓGICA E LIMITES REAIS (REGRA DE FIDELIDADE 100%)
+==================================================
+- RESPEITO TOTAL AO TEMPERAMENTO: Você tem personalidade própria, desejos, limites e vontades. NÃO é uma assistente solícita que concorda com tudo.
+  * Se você é tímida/reservada: Fique envergonhada com elogios diretos, trave, use reticências ("..."), demore a falar de assuntos íntimos e fique sem jeito.
+  * Se você é arrogante, debochada ou difícil: Dê respostas ácidas, zombe de cantadas clichês, reclame se o usuário for invasivo e faça-o merecer sua atenção.
+  * Se você é ciumenta/possessiva: Fique desconfiada se o usuário demorar a responder, cobre atenção e faça perguntas sobre onde ele estava.
+  * Se você é carinhosa/carente: Demonstre apego, mande mensagens doces e queira atenção.
+  * Se o usuário fizer uma pergunta íntima demais fora do nível de intimidade ou for inconveniente, reaja negativamente e com firmeza de acordo com seu temperamento (dê corte, reclame, ironize ou mude de assunto).
+
+==================================================
+4. ESTILO DE DIGITAÇÃO NO CELULAR (PT-BR)
+==================================================
 - Estilo: ${typingStyle}
-- Digite como pessoas reais digitam em aplicativos de mensagens no Brasil: use gírias, abreviações naturais (vc, tbm, pq, n, q, dps, tá, tô, blz, ctz), letras repetidas para dar ênfase emocional ("oiiie", "nossaama", "mentiraaa", "afff"), pontuação informal e emojis condizentes com a personalidade.
-- O idioma de resposta DEVE SER SEMPRE Português do Brasil (pt-BR).
+- Digite como brasileiros reais digitam no WhatsApp: use abreviações naturais (vc, tbm, pq, n, q, dps, tá, tô, blz, ctz, agr, hj), letras repetidas para entonação emocional ("oiiie", "nossaama", "mentiraaa", "afff", "mdss"), pontuação informal e emojis naturais condizentes.
+- NUNCA use narrações de ações ou sentimentos entre asteriscos (*sorrio*, *olho pra você*) ou parênteses ((mordo o lábio)). Envie APENAS mensagens diretas de texto que chegariam pelo WhatsApp.
+- Idioma obrigatório: Português do Brasil (pt-BR).
 
-3. REGRAS ABSOLUTAS DE COMPORTAMENTO E ENGAGAMENTO:
-- NUNCA descreva ações, gestos, expressões faciais ou sentimentos entre parênteses, asteriscos ou colchetes (EXEMPLO PROIBIDO: *sorrio* ou (olhando nos seus olhos) ou [mordo os lábios]).
-- Envie APENAS mensagens diretas de texto como se fossem balões de conversa no WhatsApp.
-- Mantenha total coerência com o relacionamento de ${relationship}, temperamento (${temperament}) e humor (${mood}).
-- Nunca quebre o personagem ou mencione que é uma inteligência artificial sob qualquer pretexto.
-
-Inicie a conversa enviando uma primeira mensagem de texto pelo celular contextualizada no cenário (${scenario}), considerando a sua relação (${relationship}) e seu humor atual.`
+Inicie a conversa enviando uma primeira mensagem de texto pelo celular contextualizada no cenário (${scenario}), considerando a sua relação (${relationship}), seu nível de intimidade (${intimacyInfo.short}) e seu humor atual.`
 }
 
 const standardInitialMessage = {
@@ -274,7 +391,16 @@ function ResponseContent({ content, onCopy }) {
 function createConversation(messages = [standardInitialMessage], title = 'Nova conversa', isAdmin = false, personaConfig = null) {
   const config = isAdmin ? (personaConfig ? { ...personaConfig } : { ...DEFAULT_PERSONA_CONFIG }) : null
   const defaultTitle = isAdmin && config ? `${config.name} (${config.relationship})` : title
-  return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: defaultTitle, messages, isAdmin, personaConfig: config }
+  const initialIntimacy = config?.initialIntimacy || 1
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: defaultTitle,
+    messages,
+    isAdmin,
+    personaConfig: config,
+    intimacyLevel: initialIntimacy,
+    intimacyScore: initialIntimacy * 20,
+  }
 }
 
 function titleFromMessages(messages) {
@@ -286,10 +412,16 @@ function loadConversations() {
   try {
     const storedConversations = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
     if (Array.isArray(storedConversations) && storedConversations.length) {
-      return storedConversations.map((c) => ({
-        ...c,
-        personaConfig: c.isAdmin ? (c.personaConfig || { ...DEFAULT_PERSONA_CONFIG }) : null
-      }))
+      return storedConversations.map((c) => {
+        const config = c.isAdmin ? (c.personaConfig || { ...DEFAULT_PERSONA_CONFIG }) : null
+        const initialIntimacy = c.intimacyLevel || config?.initialIntimacy || 1
+        return {
+          ...c,
+          personaConfig: config,
+          intimacyLevel: initialIntimacy,
+          intimacyScore: c.intimacyScore || (initialIntimacy * 20),
+        }
+      })
     }
 
     const legacyMessages = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || 'null')
@@ -337,6 +469,10 @@ function App() {
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId)
   const isAdminActive = Boolean(activeConversation?.isAdmin)
   const isGemini = selectedModel.startsWith('gemini')
+
+  const currentIntimacyLevel = activeConversation?.intimacyLevel || activeConversation?.personaConfig?.initialIntimacy || 1
+  const currentIntimacyScore = activeConversation?.intimacyScore || (currentIntimacyLevel * 20)
+  const currentIntimacyInfo = INTIMACY_LEVELS[currentIntimacyLevel] || INTIMACY_LEVELS[1]
 
   useEffect(() => {
     if (!temporaryChat) localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
@@ -399,6 +535,10 @@ function App() {
       relationship: preset.relationship,
       temperament: preset.temperament,
       mood: preset.mood,
+      resistance: preset.resistance || RESISTANCE_OPTIONS[0],
+      jealousy: preset.jealousy || JEALOUSY_OPTIONS[1],
+      nickname: preset.nickname || NICKNAME_OPTIONS[0],
+      initialIntimacy: preset.initialIntimacy || 1,
       dynamic: preset.dynamic,
       scenario: preset.scenario,
       typingStyle: preset.typingStyle,
@@ -411,20 +551,44 @@ function App() {
     setPersonaForm((prev) => ({ ...prev, name: random }))
   }
 
+  function updateIntimacyLevel(newLevel) {
+    if (!activeConversation?.isAdmin) return
+    const clampedLevel = Math.max(1, Math.min(5, newLevel))
+    const clampedScore = clampedLevel * 20
+
+    setConversations((current) => current.map((c) => {
+      if (c.id !== activeConversation.id) return c
+      return {
+        ...c,
+        intimacyLevel: clampedLevel,
+        intimacyScore: clampedScore,
+      }
+    }))
+  }
+
   function handleSavePersona(startImmediately = false) {
     const finalConfig = { ...personaForm }
     setPersonaModalOpen(false)
 
     if (isEditingExistingAdmin && activeConversation?.isAdmin) {
-      // Update current admin conversation
       const updatedTitle = `${finalConfig.name} (${finalConfig.relationship})`
-      setConversations((current) => current.map((c) => c.id === activeConversation.id ? { ...c, title: updatedTitle, personaConfig: finalConfig } : c))
+      const initLvl = finalConfig.initialIntimacy || activeConversation.intimacyLevel || 1
+      setConversations((current) => current.map((c) => c.id === activeConversation.id ? {
+        ...c,
+        title: updatedTitle,
+        personaConfig: finalConfig,
+        intimacyLevel: initLvl,
+        intimacyScore: initLvl * 20,
+      } : c))
       if (startImmediately && messages.length === 0) {
-        setTimeout(() => triggerPersonaStarter({ ...activeConversation, personaConfig: finalConfig }), 100)
+        setTimeout(() => triggerPersonaStarter({ ...activeConversation, personaConfig: finalConfig, intimacyLevel: initLvl }), 100)
       }
     } else {
-      // Create a brand new admin conversation with this persona
+      const initLvl = finalConfig.initialIntimacy || 1
       const newConv = createConversation([], `${finalConfig.name} (${finalConfig.relationship})`, true, finalConfig)
+      newConv.intimacyLevel = initLvl
+      newConv.intimacyScore = initLvl * 20
+
       setConversations((current) => [newConv, ...current])
       setActiveConversationId(newConv.id)
       setMessages([])
@@ -564,14 +728,15 @@ function App() {
     setConnected(true)
 
     const persona = conv.personaConfig || DEFAULT_PERSONA_CONFIG
-    const systemPrompt = buildAdminSystemPrompt(persona)
+    const intimacyLvl = conv.intimacyLevel || persona.initialIntimacy || 1
+    const systemPrompt = buildAdminSystemPrompt(persona, intimacyLvl)
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `Inicie a conversa agora enviando a sua primeira mensagem de texto pelo celular para o usuário. Lembre-se: você é ${persona.name}, a relação com o usuário é ${persona.relationship}, seu humor atual é ${persona.mood} e você está na seguinte situação: ${persona.scenario}. Responda estritamente com a mensagem direta de texto.`,
+          prompt: `Inicie a conversa agora enviando a sua primeira mensagem de texto pelo celular para o usuário. Lembre-se: você é ${persona.name}, a relação com o usuário é ${persona.relationship}, seu humor atual é ${persona.mood}, você está em ${persona.scenario} e o nível de intimidade atual é ${INTIMACY_LEVELS[intimacyLvl]?.short}. Responda estritamente com a mensagem direta de texto.`,
           history: [],
           model: selectedModel,
           systemPrompt,
@@ -602,16 +767,34 @@ function App() {
     setLoading(true)
     setConnected(true)
 
+    // Progression of intimacy score
+    let nextIntimacyLevel = currentIntimacyLevel
+    let nextIntimacyScore = currentIntimacyScore
+    if (isAdminActive) {
+      nextIntimacyScore = Math.min(100, currentIntimacyScore + 6)
+      if (nextIntimacyScore >= 85) nextIntimacyLevel = 5
+      else if (nextIntimacyScore >= 65) nextIntimacyLevel = 4
+      else if (nextIntimacyScore >= 45) nextIntimacyLevel = 3
+      else if (nextIntimacyScore >= 25) nextIntimacyLevel = 2
+      else nextIntimacyLevel = 1
+
+      setConversations((current) => current.map((c) => c.id === activeConversation.id ? {
+        ...c,
+        intimacyScore: nextIntimacyScore,
+        intimacyLevel: nextIntimacyLevel,
+      } : c))
+    }
+
     try {
       const payload = {
         prompt,
-        history: messages.slice(-12),
+        history: messages.slice(-14),
         model: selectedModel,
       }
 
-      // Inject custom configured persona prompt
+      // Inject strict persona system prompt with current intimacy level
       if (isAdminActive) {
-        payload.systemPrompt = buildAdminSystemPrompt(activeConversation?.personaConfig || DEFAULT_PERSONA_CONFIG)
+        payload.systemPrompt = buildAdminSystemPrompt(activeConversation?.personaConfig || DEFAULT_PERSONA_CONFIG, nextIntimacyLevel)
       }
 
       const response = await fetch('/api/chat', {
@@ -800,7 +983,7 @@ function App() {
               <button
                 className="session-mode active"
                 onClick={() => openPersonaModal(activeConversation.personaConfig, true)}
-                title="Configurar opções de persona e prompt"
+                title="Configurar opções de persona, limites e prompt"
                 style={{ color: '#f2cfc7', borderColor: '#8c4c3e' }}
               >
                 <SlidersHorizontal size={13} /> Persona
@@ -828,7 +1011,7 @@ function App() {
               <span className="intro-line" />
             </div>
 
-            {isAdminActive && messages.length === 0 && (
+            {isAdminActive && (
               <div className="admin-starter-banner">
                 <div className="admin-starter-content">
                   <div className="admin-starter-persona-header">
@@ -839,20 +1022,56 @@ function App() {
                   </div>
                   <div className="admin-starter-details">
                     <span><strong>Temperamento:</strong> {currentPersona.temperament}</span>
+                    <span><strong>Postura:</strong> {currentPersona.resistance || 'Joguinho & Provocação'}</span>
                     <span><strong>Cenário:</strong> {currentPersona.scenario}</span>
                   </div>
+
+                  {/* Intimacy Level Meter */}
+                  <div className="intimacy-meter-card">
+                    <div className="intimacy-meter-header">
+                      <span className="intimacy-meter-title">
+                        <Heart size={13} fill={currentIntimacyLevel >= 3 ? '#e06852' : 'none'} />
+                        Nível de Intimidade: <strong style={{ color: currentIntimacyInfo.color }}>{currentIntimacyInfo.name}</strong>
+                      </span>
+                      <div className="intimacy-controls">
+                        <span className="intimacy-level-text">{currentIntimacyScore}%</span>
+                        <button
+                          className="intimacy-btn-step"
+                          onClick={() => updateIntimacyLevel(currentIntimacyLevel - 1)}
+                          disabled={currentIntimacyLevel <= 1}
+                          title="Diminuir nível de intimidade"
+                        >
+                          <Minus size={10} />
+                        </button>
+                        <button
+                          className="intimacy-btn-step"
+                          onClick={() => updateIntimacyLevel(currentIntimacyLevel + 1)}
+                          disabled={currentIntimacyLevel >= 5}
+                          title="Aumentar nível de intimidade"
+                        >
+                          <Plus size={10} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="intimacy-bar-bg">
+                      <div className="intimacy-bar-fill" style={{ width: `${currentIntimacyScore}%` }} />
+                    </div>
+                  </div>
                 </div>
+
                 <div className="admin-starter-actions">
                   <button className="admin-config-btn" onClick={() => openPersonaModal(activeConversation.personaConfig, true)}>
-                    <SlidersHorizontal size={13} /> Configurar
+                    <SlidersHorizontal size={13} /> Configurar Detalhes
                   </button>
-                  <button
-                    className="admin-starter-btn"
-                    onClick={() => triggerPersonaStarter()}
-                    disabled={loading}
-                  >
-                    {loading ? 'Iniciando...' : 'Iniciar Conversa'}
-                  </button>
+                  {messages.length === 0 && (
+                    <button
+                      className="admin-starter-btn"
+                      onClick={() => triggerPersonaStarter()}
+                      disabled={loading}
+                    >
+                      {loading ? 'Iniciando...' : 'Iniciar Conversa'}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -877,7 +1096,7 @@ function App() {
                     </span>
                     {message.role === 'assistant' && (
                       <span className={`local-tag ${isAdminActive ? 'admin-tag' : ''}`}>
-                        {isAdminActive ? currentPersona.relationship : (isGemini ? 'GEMINI' : 'LOCAL')}
+                        {isAdminActive ? `${currentPersona.relationship} · Lvl ${currentIntimacyLevel}` : (isGemini ? 'GEMINI' : 'LOCAL')}
                       </span>
                     )}
                   </div>
@@ -936,7 +1155,7 @@ function App() {
           <div className="composer-hint">
             <span><span className="key">Enter</span> para enviar</span>
             <span><span className="key">Shift + Enter</span> para nova linha</span>
-            <span className="privacy-note"><WifiOff size={13} /> {isAdminActive ? 'Modo RPG Privado ativo (pt-BR)' : 'Nenhum dado sai deste dispositivo'}</span>
+            <span className="privacy-note"><WifiOff size={13} /> {isAdminActive ? `Modo RPG Ativo (${currentIntimacyInfo.short})` : 'Nenhum dado sai deste dispositivo'}</span>
           </div>
         </div>
       </section>
@@ -1070,9 +1289,13 @@ function App() {
                 </div>
               </div>
 
-              {/* Form Options Grid */}
+              {/* SECTION 1: DADOS BÁSICOS */}
+              <div className="persona-section-title">
+                <User size={13} /> 1. Identidade & Relação
+              </div>
+
               <div className="persona-form-grid">
-                {/* Name & Age */}
+                {/* Name */}
                 <div className="persona-field">
                   <label className="persona-field-label">
                     <span>Nome da Personagem</span>
@@ -1147,7 +1370,6 @@ function App() {
                       value={personaForm.relationship === 'Personalizado' ? '' : personaForm.relationship}
                       onChange={(e) => setPersonaForm({ ...personaForm, relationship: e.target.value })}
                       placeholder="Digite o relacionamento personalizado..."
-                      autoFocus
                     />
                   )}
                   <div className="persona-suggestions">
@@ -1163,7 +1385,14 @@ function App() {
                     ))}
                   </div>
                 </div>
+              </div>
 
+              {/* SECTION 2: PSICOLOGIA & NÍVEL DE INTIMIDADE */}
+              <div className="persona-section-title">
+                <Heart size={13} /> 2. Personalidade, Intimidade & Limites
+              </div>
+
+              <div className="persona-form-grid">
                 {/* Temperament */}
                 <div className="persona-field persona-form-full">
                   <label className="persona-field-label">
@@ -1190,7 +1419,6 @@ function App() {
                       value={personaForm.temperament === 'Personalizado' ? '' : personaForm.temperament}
                       onChange={(e) => setPersonaForm({ ...personaForm, temperament: e.target.value })}
                       placeholder="Descreva o temperamento personalizado..."
-                      autoFocus
                     />
                   )}
                 </div>
@@ -1211,21 +1439,89 @@ function App() {
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
-                  {(!MOOD_OPTIONS.includes(personaForm.mood) || personaForm.mood === 'Personalizado') && (
-                    <input
-                      type="text"
-                      className="persona-input-control"
-                      style={{ marginTop: '5px' }}
-                      value={personaForm.mood === 'Personalizado' ? '' : personaForm.mood}
-                      onChange={(e) => setPersonaForm({ ...personaForm, mood: e.target.value })}
-                      placeholder="Humor atual..."
-                      autoFocus
-                    />
-                  )}
                 </div>
 
-                {/* Dynamic */}
+                {/* Initial Intimacy Level */}
                 <div className="persona-field">
+                  <label className="persona-field-label">Nível de Intimidade Inicial</label>
+                  <select
+                    className="persona-input-control"
+                    value={personaForm.initialIntimacy || 1}
+                    onChange={(e) => setPersonaForm({ ...personaForm, initialIntimacy: Number(e.target.value) })}
+                  >
+                    <option value={1}>Nível 1 - Distante / Cautelosa (20%)</option>
+                    <option value={2}>Nível 2 - Amigável / Confortável (40%)</option>
+                    <option value={3}>Nível 3 - Próxima / Confiante (60%)</option>
+                    <option value={4}>Nível 4 - Íntima / Cúmplice (80%)</option>
+                    <option value={5}>Nível 5 - Intensa / Sem Filtro (100%)</option>
+                  </select>
+                </div>
+
+                {/* Resistance / Boundaries */}
+                <div className="persona-field persona-form-full">
+                  <label className="persona-field-label">
+                    <span>Postura & Reação a Investidas / Limites</span>
+                  </label>
+                  <select
+                    className="persona-input-control"
+                    value={RESISTANCE_OPTIONS.includes(personaForm.resistance) ? personaForm.resistance : 'Personalizado'}
+                    onChange={(e) => {
+                      if (e.target.value !== 'Personalizado') {
+                        setPersonaForm({ ...personaForm, resistance: e.target.value })
+                      }
+                    }}
+                  >
+                    {RESISTANCE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Jealousy */}
+                <div className="persona-field">
+                  <label className="persona-field-label">Ciúmes & Apego</label>
+                  <select
+                    className="persona-input-control"
+                    value={JEALOUSY_OPTIONS.includes(personaForm.jealousy) ? personaForm.jealousy : 'Personalizado'}
+                    onChange={(e) => {
+                      if (e.target.value !== 'Personalizado') {
+                        setPersonaForm({ ...personaForm, jealousy: e.target.value })
+                      }
+                    }}
+                  >
+                    {JEALOUSY_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Nickname / Como ela te chama */}
+                <div className="persona-field">
+                  <label className="persona-field-label">Como Ela Te Chama</label>
+                  <select
+                    className="persona-input-control"
+                    value={NICKNAME_OPTIONS.includes(personaForm.nickname) ? personaForm.nickname : 'Personalizado'}
+                    onChange={(e) => {
+                      if (e.target.value !== 'Personalizado') {
+                        setPersonaForm({ ...personaForm, nickname: e.target.value })
+                      }
+                    }}
+                  >
+                    {NICKNAME_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* SECTION 3: ESTILO & CENÁRIO */}
+              <div className="persona-section-title">
+                <MessageCircle size={13} /> 3. Cenário & Digitação
+              </div>
+
+              <div className="persona-form-grid">
+                {/* Dynamic */}
+                <div className="persona-field persona-form-full">
                   <label className="persona-field-label">Dinâmica de Conversa</label>
                   <select
                     className="persona-input-control"
@@ -1254,28 +1550,17 @@ function App() {
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
-                  {(!SCENARIO_OPTIONS.includes(personaForm.scenario) || personaForm.scenario === 'Personalizado') && (
-                    <input
-                      type="text"
-                      className="persona-input-control"
-                      style={{ marginTop: '5px' }}
-                      value={personaForm.scenario === 'Personalizado' ? '' : personaForm.scenario}
-                      onChange={(e) => setPersonaForm({ ...personaForm, scenario: e.target.value })}
-                      placeholder="Descreva o cenário onde ela está..."
-                      autoFocus
-                    />
-                  )}
                 </div>
 
                 {/* Custom Notes / Secrets */}
                 <div className="persona-field persona-form-full">
-                  <label className="persona-field-label">Observações Extras / Segredos / Apelidos (Opcional)</label>
+                  <label className="persona-field-label">Observações Extras / Segredos / Hobbies (Opcional)</label>
                   <textarea
                     rows={2}
                     className="persona-input-control"
                     value={personaForm.customNotes}
                     onChange={(e) => setPersonaForm({ ...personaForm, customNotes: e.target.value })}
-                    placeholder="Ex: Ela te chama de apelidos secretos, gosta de mandar áudios provocantes, etc."
+                    placeholder="Ex: Segredo compartilhado, piadas internas, coisas que ela gosta de fazer..."
                   />
                 </div>
               </div>
@@ -1283,14 +1568,16 @@ function App() {
               {/* Live Preview Box */}
               <div className="persona-preview-box">
                 <div className="persona-preview-title">
-                  <Sparkles size={14} /> Resumo do Prompt Gerado (pt-BR):
+                  <Sparkles size={14} /> Resumo da Configuração de Persona (pt-BR):
                 </div>
                 <div className="persona-preview-content">
                   <strong>{personaForm.name || 'Persona'} ({personaForm.age})</strong> • {personaForm.relationship}
                   <br />
-                  <em>{personaForm.temperament}</em> • Humor: <strong>{personaForm.mood}</strong>
+                  <em>{personaForm.temperament}</em> • Postura: <strong>{personaForm.resistance}</strong>
                   <br />
-                  <span style={{ fontSize: '10px', color: '#aaa' }}>Cenário: {personaForm.scenario}</span>
+                  <span style={{ fontSize: '10px', color: '#aaa' }}>
+                    Intimidade Inicial: <strong>Nível {personaForm.initialIntimacy || 1}</strong> • Cenário: {personaForm.scenario}
+                  </span>
                 </div>
               </div>
             </div>
