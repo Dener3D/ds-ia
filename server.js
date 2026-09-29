@@ -188,28 +188,26 @@ async function callGemini(selectedModel, prompt, filteredHistory, activeSystemPr
   }
 
   // Resilient models list
-  const modelsToTry = [modelToUse]
-  if (modelToUse !== 'gemini-3.1-flash-lite') {
-    modelsToTry.push('gemini-3.1-flash-lite')
-  } else {
-    modelsToTry.push('gemini-3.8-flash')
-  }
+  const modelsToTry = [modelToUse, 'gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'].filter((v, i, a) => a.indexOf(v) === i)
 
   let lastError = null
   for (const currentModel of modelsToTry) {
-    try {
-      const result = await ai.models.generateContent({
-        model: currentModel,
-        contents,
-        config,
-      })
-      return {
-        response: finalAnswer(result.text || ''),
-        model: currentModel,
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await ai.models.generateContent({
+          model: currentModel,
+          contents,
+          config,
+        })
+        return {
+          response: finalAnswer(result.text || ''),
+          model: currentModel,
+        }
+      } catch (err) {
+        lastError = err
+        console.warn(`Model ${currentModel} (attempt ${attempt + 1}) failed, retrying/falling back...`, err?.message || err)
+        await new Promise((resolve) => setTimeout(resolve, 600))
       }
-    } catch (err) {
-      lastError = err
-      console.warn(`Model ${currentModel} failed, trying fallback:`, err?.message || err)
     }
   }
 
