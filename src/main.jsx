@@ -47,7 +47,6 @@ import './styles.css'
 
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite'
 const STORAGE_KEY = 'ollama-local-chat.conversations'
-const LEGACY_STORAGE_KEY = 'ollama-local-chat.conversation'
 const CHARACTERS_STORAGE_KEY = 'ollama-local-chat.characters'
 const RELATIONSHIPS_STORAGE_KEY = 'ollama-local-chat.inter-relationships'
 const ADMIN_AUTH_KEY = 'ollama-local-chat.admin-session'
@@ -504,12 +503,10 @@ function App() {
   const [activeConversationId, setActiveConversationId] = useState(() => {
     return conversations[0]?.id || ''
   })
-  const [messages, setMessages] = useState(() => conversations[0]?.messages || [])
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [temporaryChat, setTemporaryChat] = useState(false)
   const [connected, setConnected] = useState(null)
-  const [copied, setCopied] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [modelModalOpen, setModelModalOpen] = useState(false)
   const [models, setModels] = useState([])
@@ -543,11 +540,14 @@ function App() {
 
   const endRef = useRef(null)
   const textareaRef = useRef(null)
-  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0]
+
+  // Active conversation is the single source of truth for messages
+  const activeConversation = conversations.find((c) => c.id === activeConversationId) || conversations[0]
+  const messages = activeConversation?.messages || []
   const isAdminActive = Boolean(activeConversation?.isAdmin)
   const isGemini = selectedModel.startsWith('gemini')
 
-  // Find character profile
+  // Find active character profile
   const activeCharacter = characters.find(c => c.id === activeConversation?.characterId) || activeConversation?.personaConfig || characters[0]
   const currentIntimacyLevel = activeConversation?.intimacyLevel || activeCharacter?.initialIntimacy || 1
   const currentIntimacyScore = activeConversation?.intimacyScore || (currentIntimacyLevel * 20)
@@ -568,19 +568,6 @@ function App() {
     localStorage.setItem(RELATIONSHIPS_STORAGE_KEY, JSON.stringify(interRelationships))
   }, [interRelationships])
 
-  // Sync messages to active conversation
-  useEffect(() => {
-    if (temporaryChat || !activeConversationId) return
-    setConversations((currentConversations) => currentConversations.map((conversation) => {
-      if (conversation.id !== activeConversationId) return conversation
-      return {
-        ...conversation,
-        messages,
-        updatedAt: Date.now(),
-      }
-    }))
-  }, [messages, activeConversationId, temporaryChat])
-
   useEffect(() => {
     Promise.all([fetch('/api/health'), fetch('/api/models')])
       .then(async ([healthResponse, modelsResponse]) => {
@@ -597,7 +584,7 @@ function App() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Proactivity Timer: Automatically triggers spontaneous messages periodically
+  // Proactivity Timer: Automatically triggers spontaneous messages periodically (non-blocking)
   useEffect(() => {
     if (!isAdminUnlocked || !proactivityEnabled || characters.length === 0) return
 
@@ -630,7 +617,6 @@ function App() {
           const newMsg = { role: 'assistant', content: data.response, time: formatTime(Date.now()) }
           
           setConversations(prev => {
-            // Check if conversation exists for this character
             const existing = prev.find(c => c.characterId === targetChar.id && c.isAdmin)
             if (existing) {
               return prev.map(c => {
@@ -646,21 +632,16 @@ function App() {
                 return c
               })
             } else {
-              // Create conversation
               const newConv = createConversation([newMsg], targetChar.name, true, targetChar)
               newConv.unreadCount = 1
               return [newConv, ...prev]
             }
           })
-
-          if (targetChar.id === activeConversation?.characterId) {
-            setMessages(m => [...m, newMsg])
-          }
         }
       } catch (err) {
         console.warn('Proactivity failed silently:', err)
       }
-    }, 65000) // Every 65 seconds
+    }, 70000) // Every 70 seconds
 
     return () => clearInterval(timer)
   }, [isAdminUnlocked, proactivityEnabled, characters, activeConversationId, interRelationships, selectedModel])
@@ -696,16 +677,15 @@ function App() {
     }
 
     setActiveConversationId(conv.id)
-    setMessages(conv.messages || [])
     setMobileChatOpen(true)
     setCharacterDirectoryOpen(false)
 
-    // Mark unread as 0
+    // Mark unread as 0 for this conversation
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unreadCount: 0 } : c))
 
     // If empty messages, trigger opening
     if (!conv.messages || conv.messages.length === 0) {
-      setTimeout(() => triggerPersonaStarter(conv, char), 100)
+      setTimeout(() => triggerPersonaStarter(conv.id, char), 100)
     }
   }
 
@@ -744,7 +724,6 @@ function App() {
       setConversations(remainingConvs.length ? remainingConvs : [nextConv])
       if (activeConversation?.characterId === charId) {
         setActiveConversationId(nextConv.id)
-        setMessages(nextConv.messages || [])
       }
     }
   }
@@ -839,12 +818,11 @@ function App() {
     }
     setTemporaryChat(false)
     setActiveConversationId(conversation.id)
-    setMessages(conversation.messages || [])
     setDraft('')
     setSidebarOpen(false)
     setMobileChatOpen(true)
     
-    // Mark as read
+    // Mark as read in this conversation
     setConversations(prev => prev.map(c => c.id === conversation.id ? { ...c, unreadCount: 0 } : c))
     textareaRef.current?.focus()
   }
@@ -855,13 +833,13 @@ function App() {
     setConversations(remaining.length ? remaining : [nextConversation])
     if (conversationId === activeConversationId) {
       setActiveConversationId(nextConversation.id)
-      setMessages(nextConversation.messages || [])
     }
   }
 
-  async function triggerPersonaStarter(targetConv = null, targetChar = null) {
-    const conv = targetConv || activeConversation
-    const char = targetChar || activeCharacter
+  async function triggerPersonaStarter(targetConvId = null, targetChar = null) {
+    const convId = targetConvId || activeConversationId
+    const conv = conversations.find(c => c.id === convId) || activeConversation
+    const char = targetChar || characters.find(c => c.id === conv?.characterId) || conv?.personaConfig || DEFAULT_CHARACTERS[0]
     if (loading || !conv) return
     setLoading(true)
     setConnected(true)
@@ -883,11 +861,11 @@ function App() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao gerar a mensagem.')
       const firstMsg = { role: 'assistant', content: data.response, time: formatTime(Date.now()) }
-      setMessages([firstMsg])
-      setConversations((current) => current.map((c) => c.id === conv.id ? { ...c, messages: [firstMsg], updatedAt: Date.now() } : c))
+      setConversations((current) => current.map((c) => c.id === convId ? { ...c, messages: [firstMsg], updatedAt: Date.now() } : c))
     } catch (error) {
       setConnected(false)
-      setMessages([{ role: 'error', content: error.message, time: formatTime(Date.now()) }])
+      const errorMsg = { role: 'error', content: error.message, time: formatTime(Date.now()) }
+      setConversations((current) => current.map((c) => c.id === convId ? { ...c, messages: [errorMsg], updatedAt: Date.now() } : c))
     } finally {
       setLoading(false)
       textareaRef.current?.focus()
@@ -897,14 +875,12 @@ function App() {
   async function sendMessage(event) {
     event?.preventDefault()
     const prompt = draft.trim()
-    if (!prompt || loading) return
+    if (!prompt || loading || !activeConversation) return
 
+    const currentConvId = activeConversation.id
     const userMsg = { role: 'user', content: prompt, time: formatTime(Date.now()) }
-    const nextMessages = [...messages, userMsg]
-    setMessages(nextMessages)
-    setDraft('')
-    setLoading(true)
-    setConnected(true)
+    const currentConvMessages = activeConversation.messages || []
+    const updatedMessagesWithUser = [...currentConvMessages, userMsg]
 
     // Progression of intimacy score in Admin mode
     let nextIntimacyLevel = currentIntimacyLevel
@@ -916,19 +892,28 @@ function App() {
       else if (nextIntimacyScore >= 45) nextIntimacyLevel = 3
       else if (nextIntimacyScore >= 25) nextIntimacyLevel = 2
       else nextIntimacyLevel = 1
+    }
 
-      setConversations((current) => current.map((c) => c.id === activeConversation.id ? {
+    // Update conversation with user message immediately
+    setConversations((current) => current.map((c) => {
+      if (c.id !== currentConvId) return c
+      return {
         ...c,
+        messages: updatedMessagesWithUser,
         intimacyScore: nextIntimacyScore,
         intimacyLevel: nextIntimacyLevel,
         updatedAt: Date.now(),
-      } : c))
-    }
+      }
+    }))
+
+    setDraft('')
+    setLoading(true)
+    setConnected(true)
 
     try {
       const payload = {
         prompt,
-        history: messages.slice(-14),
+        history: updatedMessagesWithUser.slice(-14),
         model: selectedModel,
       }
 
@@ -945,16 +930,26 @@ function App() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao processar a resposta.')
       const assistantMsg = { role: 'assistant', content: data.response, time: formatTime(Date.now()) }
-      setMessages([...nextMessages, assistantMsg])
-      setConversations((current) => current.map((c) => c.id === activeConversation.id ? {
-        ...c,
-        messages: [...nextMessages, assistantMsg],
-        updatedAt: Date.now(),
-      } : c))
+      
+      setConversations((current) => current.map((c) => {
+        if (c.id !== currentConvId) return c
+        return {
+          ...c,
+          messages: [...updatedMessagesWithUser, assistantMsg],
+          updatedAt: Date.now(),
+        }
+      }))
     } catch (error) {
       setConnected(false)
       const errorMsg = { role: 'error', content: error.message, time: formatTime(Date.now()) }
-      setMessages([...nextMessages, errorMsg])
+      setConversations((current) => current.map((c) => {
+        if (c.id !== currentConvId) return c
+        return {
+          ...c,
+          messages: [...updatedMessagesWithUser, errorMsg],
+          updatedAt: Date.now(),
+        }
+      }))
     } finally {
       setLoading(false)
       textareaRef.current?.focus()
@@ -966,7 +961,6 @@ function App() {
     if (characters.length === 0 || loading) return
     const char = characters[Math.floor(Math.random() * characters.length)]
     openChatWithCharacter(char)
-    setTimeout(() => triggerPersonaStarter(null, char), 150)
   }
 
   function handleKeyDown(event) {
@@ -978,11 +972,15 @@ function App() {
 
   // Filtered conversations for WhatsApp list
   const adminConversations = conversations.filter(c => c.isAdmin)
-  const filteredAdminConversations = adminConversations.filter(c => 
-    c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.personaConfig?.relationship?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.messages[c.messages.length - 1]?.content?.toLowerCase().includes(searchQuery.toLowerCase())
-  ).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+  const filteredAdminConversations = adminConversations.filter(c => {
+    const char = characters.find(ch => ch.id === c.characterId) || c.personaConfig || {}
+    const lastMsg = c.messages[c.messages.length - 1]?.content || ''
+    return (
+      (char.name || c.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (char.relationship || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lastMsg.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
 
   // =========================================================================
   // RENDER: IF IN ADMIN MODE -> RENDER WHATSAPP MESSENGER INTERFACE
@@ -1094,7 +1092,7 @@ function App() {
             ) : (
               filteredAdminConversations.map((conv) => {
                 const char = characters.find(c => c.id === conv.characterId) || conv.personaConfig || DEFAULT_CHARACTERS[0]
-                const lastMsg = conv.messages[conv.messages.length - 1]
+                const lastMsg = conv.messages && conv.messages[conv.messages.length - 1]
                 const isCurrent = conv.id === activeConversationId
                 const unread = conv.unreadCount > 0
 
@@ -1794,7 +1792,6 @@ function App() {
           const conversation = createConversation([], 'Nova conversa', false)
           setConversations((current) => [conversation, ...current])
           setActiveConversationId(conversation.id)
-          setMessages(conversation.messages)
           setDraft('')
           setSidebarOpen(false)
           textareaRef.current?.focus()
