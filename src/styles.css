@@ -171,14 +171,47 @@ button { cursor: pointer; }
 .wa-bubble-row { display: flex; width: 100%; animation: rise .2s ease both; }
 .wa-bubble-row.user { justify-content: flex-end; }
 .wa-bubble-row.assistant { justify-content: flex-start; }
+.wa-bubble-row.system { justify-content: center; }
 .wa-bubble { max-width: 65%; min-width: 110px; border-radius: 8px; padding: 6px 10px 6px 12px; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,.3); font-size: 14.2px; line-height: 1.45; word-wrap: break-word; }
 .wa-bubble.user { background: #005c4b; color: #e9edef; border-top-right-radius: 2px; }
 .wa-bubble.assistant { background: #202c33; color: #e9edef; border-top-left-radius: 2px; }
 .wa-bubble.error { background: #491f1f; color: #f2a799; }
+.wa-group-sender { font-size: 12px; font-weight: 700; display: block; margin-bottom: 2px; line-height: 1.2; }
+.wa-bubble-photo-wrap { position: relative; margin-bottom: 6px; border-radius: 6px; overflow: hidden; background: #182229; cursor: pointer; }
+.wa-bubble-photo-wrap:hover .wa-photo-hover-overlay { opacity: 1; }
+.wa-bubble-photo-img { display: block; width: 100%; max-width: 320px; max-height: 380px; object-fit: cover; border-radius: 6px; transition: transform .2s; }
+.wa-bubble-photo-img:hover { transform: scale(1.02); }
+.wa-photo-hover-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .2s; color: #fff; font-size: 12px; gap: 6px; }
+.wa-photo-loading-box { width: 280px; height: 260px; background: #1a252c; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #8696a0; font-size: 12px; }
+
+/* Photo Action Buttons in Chat Bubble */
+.wa-photo-actions-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; }
+.wa-photo-action-btn { display: inline-flex; align-items: center; gap: 5px; background: rgba(32, 44, 51, 0.9); border: 1px solid rgba(255, 255, 255, 0.12); color: #d1d7db; font-size: 11.5px; font-weight: 500; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all .15s; }
+.wa-photo-action-btn:hover { background: #2a3942; color: #fff; border-color: rgba(255, 255, 255, 0.25); }
+.wa-photo-action-btn.view { color: #53bdeb; }
+.wa-photo-action-btn.view:hover { background: rgba(83, 189, 235, 0.15); border-color: #53bdeb; }
+.wa-photo-action-btn.delete { color: #f85149; }
+.wa-photo-action-btn.delete:hover { background: rgba(248, 81, 73, 0.18); border-color: #f85149; }
+
 .wa-bubble-text { margin: 0; white-space: pre-wrap; }
 .wa-bubble-meta { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 10px; color: #8696a0; margin-top: 2px; }
+
+/* Lightbox Modal */
+.wa-lightbox-modal { position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; animation: modal-fade .2s ease; }
+.wa-lightbox-header { position: absolute; top: 16px; right: 16px; display: flex; gap: 10px; z-index: 10; }
+.wa-lightbox-img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+.wa-lightbox-caption { margin-top: 14px; color: #e9edef; font-size: 14px; text-align: center; max-width: 600px; background: rgba(32, 44, 51, 0.85); padding: 8px 16px; border-radius: 20px; }
 .wa-bubble.user .wa-bubble-meta { color: #78a89e; }
 .wa-checkmarks { color: #53bdeb; }
+
+.wa-system-pill { align-self: center; background: rgba(24, 34, 41, 0.95); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 5px 14px; font-size: 11.5px; color: #ffd279; text-align: center; max-width: 520px; margin: 6px auto; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+/* Group Member Multi-Select List */
+.wa-group-select-grid { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.wa-group-select-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #252628; border: 1px solid #3d3e40; border-radius: 8px; cursor: pointer; transition: all .15s; }
+.wa-group-select-item:hover { background: #2f3034; border-color: #00a884; }
+.wa-group-select-item.selected { background: rgba(0, 168, 132, 0.15); border-color: #00a884; }
+.wa-group-member-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; background: rgba(0, 168, 132, 0.18); border-radius: 12px; color: #25d366; font-size: 10px; font-weight: 600; }
 
 /* Typing indicator bubble */
 .wa-typing-bubble { background: #202c33; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 6px; width: fit-content; }

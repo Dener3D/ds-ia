@@ -188,7 +188,7 @@ async function callGemini(selectedModel, prompt, filteredHistory, activeSystemPr
   }
 
   // Resilient models list
-  const modelsToTry = [modelToUse, 'gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'].filter((v, i, a) => a.indexOf(v) === i)
+  const modelsToTry = [modelToUse, 'gemini-3.8-flash', 'gemini-3.1-flash-lite'].filter((v, i, a) => a.indexOf(v) === i)
 
   let lastError = null
   for (const currentModel of modelsToTry) {
@@ -340,6 +340,165 @@ app.post('/api/chat', async (request, response) => {
   return response.status(503).json({
     error: `Serviço de IA indisponível. Verifique o Ollama local ou a chave de API.`,
   })
+})
+
+app.post('/api/generate-photo', express.json(), async (request, response) => {
+  try {
+    const { prompt, character, scenario, context, userPrompt, characterReply, conversationHistory } = request.body || {}
+    const charName = character?.name || 'Personagem'
+    const charAge = character?.age || '22 anos'
+    const physDesc = character?.physicalDescription || 'Brazilian woman, natural beauty, expressive eyes, attractive, realistic look'
+    const charTemp = character?.temperament || 'Natural and expressive'
+    const charScenario = scenario || character?.scenario || 'cozy bedroom relaxing'
+    const effectiveUserRequest = userPrompt || prompt || context || 'Manda uma foto'
+    const effectiveCharReply = characterReply || ''
+
+    let historySummary = ''
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      historySummary = conversationHistory.slice(-8).map(m => `${m.role === 'user' ? 'User' : (m.senderName || 'Character')}: ${m.content}`).join('\n')
+    } else if (typeof context === 'string' && context.trim()) {
+      historySummary = context
+    }
+
+    // 1. Analyze consent and subject with Gemini
+    let shouldGenerate = true
+    const isExplicitCharacterRequest = /(?:foto\s+sua|selfie|voc[eê]|sua\s+foto|foto\s+de\s+vc|foto\s+de\s+voc[eê]|tomando\s+banho|deitada|seu\s+rosto|seu\s+corpo)/i.test(effectiveUserRequest)
+    
+    // Default photorealistic prompt
+    let refinedPrompt = isExplicitCharacterRequest
+      ? `Authentic candid raw smartphone photograph, taken with iPhone 15 Pro, 35mm lens, natural ambient lighting, candid shot of ${charName}, ${physDesc}, in ${charScenario}, looking at camera, fine natural skin pores, unedited real life photo, sharp focus. No 3D render, no CGI, no plastic skin, no doll, no videogame graphics, no digital art`
+      : `Authentic candid raw smartphone photograph, taken with iPhone 15 Pro, first-person POV shot of ${effectiveUserRequest}, in ${charScenario}, natural real-world lighting, fine textures, photorealistic documentary style, sharp focus. No 3D render, no CGI, no cartoon`
+
+    if (ai) {
+      const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.8-flash']
+      for (const modelName of modelsToTry) {
+        try {
+          const evalRes = await ai.models.generateContent({
+            model: modelName,
+            config: {
+              systemInstruction: `You are an expert AI evaluator and master photography prompt engineer for a WhatsApp chat simulation.
+Analyze the user request, the character reply, and the chat history. Decide if an image should actually be generated and write the exact ultra-photorealistic prompt.
+
+CRITICAL RULES:
+1. CONSENT & WILLINGNESS CHECK:
+   - Check the character's reply and mood: If the character REFUSED, declined, is angry/annoyed, says no (e.g. "Nem pensar", "Não vou mandar nada", "Agora não", "Tô brava", "Sai fora", "Nem a pau", "Esquece", "Não quero"), you MUST set "shouldGenerate": false.
+   - If the character AGREED, accepted, or sent the picture (e.g. "Tá bom, vou mandar", "Olha aí", "Tirei essa agora", "Espera aí que já te mando", "Aqui ó", or included a [FOTO] tag), set "shouldGenerate": true.
+
+2. SUBJECT IDENTIFICATION (STRICT SEPARATION):
+   - OBJECT / VEHICLE / SCENERY / PLACE / FOOD / ANIMAL:
+     If the user asked for an object, car, motorcycle, room, food, view, beach, pet, street (e.g. "foto do carro", "foto da pizza", "foto do seu cachorro", "foto da praia"), the imagePrompt MUST depict ONLY that requested object/vehicle/place in first-person POV smartphone camera perspective. DO NOT include the character or any random person!
+   - CHARACTER / PERSON PHOTO:
+     ONLY when the user explicitly asked for a photo of the person/character herself/himself (e.g. "foto sua", "uma selfie sua", "foto sua agora tomando banho", "foto de você na cama"), generate a realistic photo/selfie of the character matching physical attributes (${physDesc}), age (${charAge}), and the exact situation requested (e.g. in the shower with steam, lying on bed, at work).
+
+3. ULTRA-PHOTOREALISM & STRICT ANTI-3D CONSTRAINTS (MANDATORY):
+   - The image MUST look like a genuine, unedited raw smartphone photo taken on an iPhone 15 Pro / Galaxy S24, NOT a 3D render, CGI, digital illustration or videogame asset.
+   - Include realistic camera photography traits: natural ambient lighting, subtle natural shadows, realistic skin texture with fine visible pores and tiny natural imperfections, authentic hair strands, candid angle, slight mobile camera lens grain, real depth of field.
+   - Prepend and append realism anchors: "Authentic candid raw smartphone photograph, 35mm lens, natural real-life lighting, ultra realistic photo, fine skin texture"
+   - STRICT NEGATIVES to prevent artificial 3D look: "no 3D render, no CGI, no plastic doll skin, no octane render, no airbrushed smooth filter, no videogame graphics, no digital illustration, no cartoon".
+
+Return valid JSON with these keys:
+{
+  "shouldGenerate": boolean,
+  "reason": string,
+  "subjectType": "object" | "character",
+  "imagePrompt": string
+}`,
+              responseMimeType: 'application/json',
+              temperature: 0.2,
+            },
+            contents: `Character Profile:
+- Name: ${charName}
+- Age: ${charAge}
+- Physical Appearance & Features: ${physDesc}
+- Temperament: ${charTemp}
+- Current Scenario/Location: ${charScenario}
+
+Recent Conversation History:
+${historySummary || 'User asked for a photo'}
+
+User Request for photo:
+"${effectiveUserRequest}"
+
+Character Reply in chat:
+"${effectiveCharReply}"`,
+          })
+
+          if (evalRes.text) {
+            try {
+              const parsed = JSON.parse(evalRes.text.trim())
+              if (parsed.shouldGenerate === false) {
+                shouldGenerate = false
+                return response.json({
+                  success: true,
+                  shouldGenerate: false,
+                  reason: parsed.reason || 'Character refused photo request',
+                  imageUrl: null,
+                })
+              }
+              if (parsed.imagePrompt && parsed.imagePrompt.trim().length > 15) {
+                refinedPrompt = parsed.imagePrompt.trim()
+                shouldGenerate = true
+                break
+              }
+            } catch (jsonErr) {
+              console.warn('JSON parse warning on photo evaluation:', jsonErr)
+            }
+          }
+        } catch (err) {
+          console.warn(`Gemini photo prompt evaluation (${modelName}) warning:`, err?.message || err)
+        }
+      }
+    }
+
+    if (!shouldGenerate) {
+      return response.json({
+        success: true,
+        shouldGenerate: false,
+        imageUrl: null,
+      })
+    }
+
+    // 2. Synthesize high quality realistic image
+    let imageUrl = null
+
+    // Direct Gemini Image Model attempt if permitted
+    if (ai) {
+      const imageModels = ['gemini-3.1-flash-image']
+      for (const imgModel of imageModels) {
+        try {
+          const imgRes = await ai.models.generateContent({
+            model: imgModel,
+            contents: refinedPrompt,
+          })
+          const part = imgRes.candidates?.[0]?.content?.parts?.find(p => p.inlineData && p.inlineData.data)
+          if (part) {
+            imageUrl = `data:${part.inlineData.mimeType || 'image/jpeg'};base64,${part.inlineData.data}`
+            break
+          }
+        } catch {
+          // Fall through to resilient synthesis
+        }
+      }
+    }
+
+    // 3. High-quality realistic image synthesis URL
+    if (!imageUrl) {
+      const seed = Math.floor(Math.random() * 9999999)
+      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 380)}, raw photograph, high resolution, 35mm photography, natural lighting, highly detailed, photorealistic, candid, sharp focus`
+      const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
+      imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
+    }
+
+    return response.json({
+      success: true,
+      shouldGenerate: true,
+      imageUrl,
+      prompt: refinedPrompt,
+    })
+  } catch (err) {
+    console.error('Photo generation endpoint error:', err)
+    return response.status(500).json({ error: 'Erro ao gerar foto', detail: err.message })
+  }
 })
 
 if (!isProduction) {
