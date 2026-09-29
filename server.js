@@ -458,41 +458,71 @@ Character Reply in chat:
       })
     }
 
-    // 2. Synthesize high quality realistic image
+    // 2. Synthesize ultra-high quality realistic image with Gemini's best realistic image generator
     let imageUrl = null
+    let usedModel = null
 
-    // Direct Gemini Image Model attempt if permitted
+    // Direct Gemini Image Model attempt (Priority: gemini-3-pro-image -> gemini-3.1-flash-image -> gemini-3.1-flash-lite-image)
     if (ai) {
-      const imageModels = ['gemini-3.1-flash-image']
+      const imageModels = ['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image']
       for (const imgModel of imageModels) {
         try {
+          const isProOrFlash = imgModel === 'gemini-3-pro-image' || imgModel === 'gemini-3.1-flash-image'
+          const imgConfig = {
+            imageConfig: {
+              aspectRatio: '3:4',
+              ...(isProOrFlash ? { imageSize: '2K' } : {}),
+            },
+          }
+
           const imgRes = await ai.models.generateContent({
             model: imgModel,
-            contents: refinedPrompt,
+            contents: {
+              parts: [
+                {
+                  text: refinedPrompt,
+                },
+              ],
+            },
+            config: imgConfig,
           })
-          const part = imgRes.candidates?.[0]?.content?.parts?.find(p => p.inlineData && p.inlineData.data)
-          if (part) {
-            imageUrl = `data:${part.inlineData.mimeType || 'image/jpeg'};base64,${part.inlineData.data}`
+
+          for (const cand of imgRes.candidates || []) {
+            for (const part of cand.content?.parts || []) {
+              if (part.inlineData && part.inlineData.data) {
+                const mime = part.inlineData.mimeType || 'image/jpeg'
+                imageUrl = `data:${mime};base64,${part.inlineData.data}`
+                usedModel = imgModel
+                break
+              }
+            }
+            if (imageUrl) break
+          }
+
+          if (imageUrl) {
+            console.log(`[Photo Generation] Successfully generated realistic photo using Gemini model: ${imgModel}`)
             break
           }
-        } catch {
-          // Fall through to resilient synthesis
+        } catch (imgErr) {
+          console.warn(`[Photo Generation] Model ${imgModel} attempt warning:`, imgErr?.message || imgErr)
         }
       }
     }
 
-    // 3. High-quality realistic image synthesis URL
+    // 3. Resilient fallback if Gemini is offline or rate-limited
     if (!imageUrl) {
       const seed = Math.floor(Math.random() * 9999999)
       const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 380)}, raw photograph, high resolution, 35mm photography, natural lighting, highly detailed, photorealistic, candid, sharp focus`
       const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
       imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
+      usedModel = 'flux-fallback'
     }
 
     return response.json({
       success: true,
       shouldGenerate: true,
       imageUrl,
+      model: usedModel,
       prompt: refinedPrompt,
     })
   } catch (err) {
