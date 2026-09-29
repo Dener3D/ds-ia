@@ -98,6 +98,49 @@ app.get('/api/health', async (_request, response) => {
   return response.status(503).json({ connected: false, model })
 })
 
+export const AVAILABLE_IMAGE_MODELS = [
+  {
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image',
+    alias: 'Nano Banana Pro',
+    badge: 'Pro 2K · Ultra-Realismo',
+    description: 'Máxima fidelidade fotográfica, micro-detalhes de textura de pele e poros, iluminação ambiente natural realista e resolução 2K.',
+    family: 'gemini',
+    resolution: '2K',
+    recommended: true,
+  },
+  {
+    id: 'gemini-3.1-flash-image',
+    name: 'Gemini 3.1 Flash Image',
+    alias: 'Nano Banana 2',
+    badge: 'Flash 2K · Rápido',
+    description: 'Alta qualidade e rapidez na geração de fotografias realistas com suporte a 2K e excelente consistência visual.',
+    family: 'gemini',
+    resolution: '2K',
+    recommended: false,
+  },
+  {
+    id: 'gemini-3.1-flash-lite-image',
+    name: 'Gemini 3.1 Flash Lite Image',
+    alias: 'Nano Banana Lite',
+    badge: 'Lite · Econômico',
+    description: 'Modelo leve para geração rápida de fotos com baixo consumo de recursos.',
+    family: 'gemini',
+    resolution: '1K',
+    recommended: false,
+  },
+  {
+    id: 'flux',
+    name: 'Flux Realism Engine',
+    alias: 'Flux Diffusion',
+    badge: 'Flux 1024px · Fallback',
+    description: 'Modelo alternativo baseado em difusão fotográfica para estilo foto espontânea de smartphone.',
+    family: 'flux',
+    resolution: '1024px',
+    recommended: false,
+  },
+]
+
 app.get('/api/models', async (_request, response) => {
   try {
     const controller = new AbortController()
@@ -115,6 +158,8 @@ app.get('/api/models', async (_request, response) => {
           })),
           defaultModel: model,
           provider: 'ollama',
+          imageModels: AVAILABLE_IMAGE_MODELS,
+          defaultImageModel: 'gemini-3-pro-image',
         })
       }
     }
@@ -133,6 +178,8 @@ app.get('/api/models', async (_request, response) => {
       ],
       defaultModel: 'gemini-3.1-flash-lite',
       provider: 'gemini',
+      imageModels: AVAILABLE_IMAGE_MODELS,
+      defaultImageModel: 'gemini-3-pro-image',
     })
   }
 
@@ -144,6 +191,8 @@ app.get('/api/models', async (_request, response) => {
     ],
     defaultModel: model,
     offline: true,
+    imageModels: AVAILABLE_IMAGE_MODELS,
+    defaultImageModel: 'gemini-3-pro-image',
   })
 })
 
@@ -458,13 +507,30 @@ Character Reply in chat:
       })
     }
 
-    // 2. Synthesize ultra-high quality realistic image with Gemini's best realistic image generator
+    // 2. Synthesize ultra-high quality realistic image with selected/best image generator
     let imageUrl = null
     let usedModel = null
 
-    // Direct Gemini Image Model attempt (Priority: gemini-3-pro-image -> gemini-3.1-flash-image -> gemini-3.1-flash-lite-image)
-    if (ai) {
-      const imageModels = ['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image']
+    const requestedImageModel = typeof request.body?.imageModel === 'string' && request.body.imageModel.trim()
+      ? request.body.imageModel.trim()
+      : 'gemini-3-pro-image'
+
+    // If user explicitly chose Flux diffusion engine
+    if (requestedImageModel === 'flux') {
+      const seed = Math.floor(Math.random() * 9999999)
+      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 380)}, raw photograph, high resolution, 35mm photography, natural lighting, highly detailed, photorealistic, candid, sharp focus`
+      const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
+      imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
+      usedModel = 'flux'
+    } else if (ai) {
+      // Prioritize the user's selected Gemini image model first
+      const imageModels = [
+        requestedImageModel,
+        'gemini-3-pro-image',
+        'gemini-3.1-flash-image',
+        'gemini-3.1-flash-lite-image',
+      ].filter((v, i, a) => a.indexOf(v) === i)
+
       for (const imgModel of imageModels) {
         try {
           const isProOrFlash = imgModel === 'gemini-3-pro-image' || imgModel === 'gemini-3.1-flash-image'

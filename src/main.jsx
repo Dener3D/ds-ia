@@ -56,7 +56,51 @@ const STORAGE_KEY = 'ollama-local-chat.conversations'
 const CHARACTERS_STORAGE_KEY = 'ollama-local-chat.characters'
 const RELATIONSHIPS_STORAGE_KEY = 'ollama-local-chat.inter-relationships'
 const ADMIN_AUTH_KEY = 'ollama-local-chat.admin-session'
+const IMAGE_MODEL_STORAGE_KEY = 'ollama-local-chat.selected-image-model'
 const ADMIN_PASSWORD = '@admin2026'
+
+export const DEFAULT_IMAGE_MODELS = [
+  {
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image',
+    alias: 'Nano Banana Pro',
+    badge: 'Pro 2K · Ultra-Realismo',
+    description: 'Máxima fidelidade fotográfica, micro-detalhes de textura de pele e poros, iluminação ambiente natural realista e resolução 2K.',
+    family: 'gemini',
+    resolution: '2K',
+    recommended: true,
+  },
+  {
+    id: 'gemini-3.1-flash-image',
+    name: 'Gemini 3.1 Flash Image',
+    alias: 'Nano Banana 2',
+    badge: 'Flash 2K · Rápido',
+    description: 'Alta qualidade e rapidez na geração de fotografias realistas com suporte a 2K e excelente consistência visual.',
+    family: 'gemini',
+    resolution: '2K',
+    recommended: false,
+  },
+  {
+    id: 'gemini-3.1-flash-lite-image',
+    name: 'Gemini 3.1 Flash Lite Image',
+    alias: 'Nano Banana Lite',
+    badge: 'Lite · Econômico',
+    description: 'Modelo leve para geração rápida de fotos com baixo consumo de recursos.',
+    family: 'gemini',
+    resolution: '1K',
+    recommended: false,
+  },
+  {
+    id: 'flux',
+    name: 'Flux Realism Engine',
+    alias: 'Flux Diffusion',
+    badge: 'Flux 1024px · Fallback',
+    description: 'Modelo alternativo baseado em difusão fotográfica para estilo foto espontânea de smartphone.',
+    family: 'flux',
+    resolution: '1024px',
+    recommended: false,
+  },
+]
 
 export const INTIMACY_LEVELS = {
   1: {
@@ -579,7 +623,7 @@ function cleanSpeakerPrefix(text, speakerName = '') {
 }
 
 // Process photo tag extraction and generation with full conversation context and consent evaluation
-async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', conversationHistory = []) {
+async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', conversationHistory = [], imageModel = 'gemini-3-pro-image') {
   const isDirectPhotoRequest = /(?:foto|selfie|picture|tira\s+uma\s+foto|manda\s+uma\s+foto|manda\s+foto|mostra\s+foto|manda\s+fotinha|quero\s+te\s+ver|quero\s+ver\s+voc[eê]|como\s+vc\s+t[aá]|manda\s+nudes|camera|selfiezinha|manda\s+uma\s+selfie|manda\s+sua\s+foto|manda\s+uma\s+pic|foto\s+do|foto\s+da|foto\s+de)/i.test(userPrompt)
   const photoMatch = rawText.match(/\[(?:FOTO|ENVIAR_FOTO):\s*([^\]]+)\]/i)
   
@@ -589,7 +633,7 @@ async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', con
   const cleanText = cleanSpeakerPrefix(textWithoutTags, speakerChar?.name)
 
   if (!photoMatch && (!isDirectPhotoRequest || isRefusal)) {
-    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null }
+    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null }
   }
 
   const photoDesc = photoMatch ? photoMatch[1].trim() : ''
@@ -606,20 +650,22 @@ async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', con
         userPrompt,
         characterReply: cleanText,
         conversationHistory: Array.isArray(conversationHistory) ? conversationHistory.slice(-8) : [],
+        imageModel: imageModel || 'gemini-3-pro-image',
       }),
     })
     const photoData = await photoRes.json()
     if (photoData.shouldGenerate === false || !photoData.imageUrl) {
-      return { cleanText: cleanText || '...', photoUrl: null, photoPrompt: null }
+      return { cleanText: cleanText || '...', photoUrl: null, photoPrompt: null, photoModel: null }
     }
     return {
       cleanText: cleanText || '📷 Foto enviada',
       photoUrl: photoData.imageUrl,
       photoPrompt: photoData.prompt || photoDesc,
+      photoModel: photoData.model || imageModel,
     }
   } catch (err) {
     console.warn('Error generating photo for chat message:', err)
-    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null }
+    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null }
   }
 }
 
@@ -638,8 +684,13 @@ function App() {
   const [connected, setConnected] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [modelModalOpen, setModelModalOpen] = useState(false)
+  const [modelModalTab, setModelModalTab] = useState('chat') // 'chat' | 'image'
   const [models, setModels] = useState([])
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL)
+  const [imageModels, setImageModels] = useState(DEFAULT_IMAGE_MODELS)
+  const [selectedImageModel, setSelectedImageModel] = useState(() => {
+    return localStorage.getItem(IMAGE_MODEL_STORAGE_KEY) || 'gemini-3-pro-image'
+  })
   const [editingConversationId, setEditingConversationId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -724,6 +775,9 @@ function App() {
         const data = await modelsResponse.json()
         setModels(data.models || [])
         setSelectedModel(data.defaultModel || data.models?.[0]?.name || DEFAULT_MODEL)
+        if (data.imageModels && Array.isArray(data.imageModels) && data.imageModels.length > 0) {
+          setImageModels(data.imageModels)
+        }
       })
       .catch(() => setConnected(false))
   }, [])
@@ -775,12 +829,13 @@ function App() {
         })
         const data = await response.json()
         if (data.response) {
-          const { cleanText, photoUrl, photoPrompt } = await processPhotoInResponse(data.response, targetChar)
+          const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, targetChar, '', [], selectedImageModel)
           const newMsg = {
             role: 'assistant',
             content: cleanText,
             photoUrl,
             photoPrompt,
+            photoModel,
             time: formatTime(Date.now()),
             senderName: targetChar.name,
             senderId: targetChar.id,
@@ -874,12 +929,13 @@ function App() {
       })
       const data = await response.json()
       if (data.response) {
-        const { cleanText, photoUrl, photoPrompt } = await processPhotoInResponse(data.response, speaker, '', formattedHistory)
+        const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, speaker, '', formattedHistory, selectedImageModel)
         const assistantMsg = {
           role: 'assistant',
           content: cleanText,
           photoUrl,
           photoPrompt,
+          photoModel,
           senderName: speaker.name,
           senderId: speaker.id,
           senderAvatarColor: speaker.avatarColor,
@@ -1023,12 +1079,13 @@ function App() {
         })
         const data = await response.json()
         if (data.response) {
-          const { cleanText, photoUrl, photoPrompt } = await processPhotoInResponse(data.response, newlyAddedSpeaker, '', updatedMessages)
+          const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, newlyAddedSpeaker, '', updatedMessages, selectedImageModel)
           const introMsg = {
             role: 'assistant',
             content: cleanText,
             photoUrl,
             photoPrompt,
+            photoModel,
             senderName: newlyAddedSpeaker.name,
             senderId: newlyAddedSpeaker.id,
             senderAvatarColor: newlyAddedSpeaker.avatarColor,
@@ -1202,6 +1259,7 @@ function App() {
             ...msg,
             photoUrl: null,
             photoPrompt: null,
+            photoModel: null,
           }
         }
         return msg
@@ -1259,12 +1317,13 @@ function App() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao gerar a mensagem.')
       
-      const { cleanText, photoUrl, photoPrompt } = await processPhotoInResponse(data.response, char)
+      const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, char, '', [], selectedImageModel)
       const firstMsg = {
         role: 'assistant',
         content: cleanText,
         photoUrl,
         photoPrompt,
+        photoModel,
         time: formatTime(Date.now()),
         senderName: char.name,
         senderId: char.id,
@@ -1353,12 +1412,13 @@ function App() {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao processar a resposta.')
         
-        const { cleanText, photoUrl, photoPrompt } = await processPhotoInResponse(data.response, firstSpeaker, prompt, updatedMessagesWithUser)
+        const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, firstSpeaker, prompt, updatedMessagesWithUser, selectedImageModel)
         const assistantMsg = {
           role: 'assistant',
           content: cleanText,
           photoUrl,
           photoPrompt,
+          photoModel,
           senderName: firstSpeaker.name,
           senderId: firstSpeaker.id,
           senderAvatarColor: firstSpeaker.avatarColor,
@@ -1405,12 +1465,13 @@ function App() {
               })
               const secondData = await secondResponse.json()
               if (secondData.response) {
-                const { cleanText: secCleanText, photoUrl: secPhotoUrl, photoPrompt: secPhotoPrompt } = await processPhotoInResponse(secondData.response, secondSpeaker, prompt, messagesAfterFirstSpeaker)
+                const { cleanText: secCleanText, photoUrl: secPhotoUrl, photoPrompt: secPhotoPrompt, photoModel: secPhotoModel } = await processPhotoInResponse(secondData.response, secondSpeaker, prompt, messagesAfterFirstSpeaker, selectedImageModel)
                 const secondMsg = {
                   role: 'assistant',
                   content: secCleanText,
                   photoUrl: secPhotoUrl,
                   photoPrompt: secPhotoPrompt,
+                  photoModel: secPhotoModel,
                   senderName: secondSpeaker.name,
                   senderId: secondSpeaker.id,
                   senderAvatarColor: secondSpeaker.avatarColor,
@@ -1472,13 +1533,14 @@ function App() {
         if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao processar a resposta.')
         
         // Process photo generated with full conversation context
-        const { cleanText, photoUrl, photoPrompt } = await processPhotoInResponse(data.response, activeCharacter, prompt, updatedMessagesWithUser)
+        const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, activeCharacter, prompt, updatedMessagesWithUser, selectedImageModel)
 
         const assistantMsg = {
           role: 'assistant',
           content: cleanText,
           photoUrl,
           photoPrompt,
+          photoModel,
           senderName: activeCharacter?.name,
           senderId: activeCharacter?.id,
           senderAvatarColor: activeCharacter?.avatarColor,
@@ -1549,6 +1611,16 @@ function App() {
               <button
                 className="wa-icon-btn"
                 onClick={() => {
+                  setModelModalTab('image')
+                  setModelModalOpen(true)
+                }}
+                title="Configurar Modelo Gerador de Fotos / Imagens"
+              >
+                <Camera size={19} />
+              </button>
+              <button
+                className="wa-icon-btn"
+                onClick={() => {
                   setSelectedGroupMembers([])
                   setNewGroupName('')
                   setNewGroupModalOpen(true)
@@ -1598,7 +1670,20 @@ function App() {
               <Zap size={13} fill="#00a884" />
               <span>Proatividade {proactivityEnabled ? 'Ativa' : 'Pausada'}</span>
             </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="wa-proactive-trigger-btn"
+                style={{ color: '#53bdeb', borderColor: 'rgba(83, 189, 235, 0.35)' }}
+                onClick={() => {
+                  setModelModalTab('image')
+                  setModelModalOpen(true)
+                }}
+                title="Trocar Modelo de Geração de Imagem"
+              >
+                <Camera size={11} />
+                <span>Foto: {imageModels.find(m => m.id === selectedImageModel)?.name?.split('(')[0]?.trim() || 'Gemini 3 Pro'}</span>
+              </button>
               {isGroupChat && (
                 <button
                   className="wa-proactive-trigger-btn"
@@ -1885,7 +1970,7 @@ function App() {
                           <div className="wa-bubble-photo-container">
                             <div
                               className="wa-bubble-photo-wrap"
-                              onClick={() => setLightboxData({ url: msg.photoUrl, caption: msg.content, sender: msg.senderName, convId: activeConversation.id, msgIndex: index })}
+                              onClick={() => setLightboxData({ url: msg.photoUrl, caption: msg.content, sender: msg.senderName, convId: activeConversation.id, msgIndex: index, model: msg.photoModel })}
                               title="Clique para ver foto ampliada em tela cheia"
                             >
                               <img
@@ -1905,7 +1990,7 @@ function App() {
                                 className="wa-photo-action-btn view"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setLightboxData({ url: msg.photoUrl, caption: msg.content, sender: msg.senderName, convId: activeConversation.id, msgIndex: index })
+                                  setLightboxData({ url: msg.photoUrl, caption: msg.content, sender: msg.senderName, convId: activeConversation.id, msgIndex: index, model: msg.photoModel })
                                 }}
                                 title="Ver imagem ampliada"
                               >
@@ -1925,6 +2010,12 @@ function App() {
                                 <span>Apagar foto</span>
                               </button>
                             </div>
+                            {msg.photoModel && (
+                              <div className="wa-photo-model-tag" title="Modelo de IA utilizado para gerar esta imagem">
+                                <Sparkles size={10} color="#25d366" />
+                                <span>{imageModels.find(m => m.id === msg.photoModel)?.name?.split('(')[0]?.trim() || msg.photoModel}</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -2057,7 +2148,13 @@ function App() {
             {lightboxData.caption && (
               <div className="wa-lightbox-caption" onClick={(e) => e.stopPropagation()}>
                 {lightboxData.sender && <strong>{lightboxData.sender}: </strong>}
-                {lightboxData.caption}
+                <span>{lightboxData.caption}</span>
+                {lightboxData.model && (
+                  <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', fontSize: '11px', color: '#25d366' }}>
+                    <Sparkles size={12} />
+                    <span>Modelo de Renderização: {imageModels.find(m => m.id === lightboxData.model)?.name || lightboxData.model}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2680,6 +2777,89 @@ function App() {
             </section>
           </div>
         )}
+
+        {/* Model Selection Modal inside WhatsApp Mode */}
+        {modelModalOpen && (
+          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setModelModalOpen(false)}>
+            <section className="model-modal" role="dialog" aria-modal="true">
+              <div className="modal-heading">
+                <div>
+                  <span className="modal-kicker">SELEÇÃO DE MODELOS</span>
+                  <h2>{modelModalTab === 'image' ? 'Modelos de Geração de Fotos' : 'Modelos de Conversa (Chat)'}</h2>
+                  <p>{modelModalTab === 'image' ? 'Escolha o modelo de IA para gerar fotos e selfies realistas no chat.' : 'Escolha o modelo de linguagem para processamento das mensagens.'}</p>
+                </div>
+                <button className="icon-button" onClick={() => setModelModalOpen(false)}><X size={18} /></button>
+              </div>
+
+              <div className="model-tabs">
+                <button
+                  type="button"
+                  className={`model-tab-btn ${modelModalTab === 'chat' ? 'active' : ''}`}
+                  onClick={() => setModelModalTab('chat')}
+                >
+                  <Bot size={15} />
+                  <span>Chat / Conversa</span>
+                </button>
+                <button
+                  type="button"
+                  className={`model-tab-btn ${modelModalTab === 'image' ? 'active' : ''}`}
+                  onClick={() => setModelModalTab('image')}
+                >
+                  <Camera size={15} />
+                  <span>Geração de Fotos / Imagens</span>
+                </button>
+              </div>
+
+              {modelModalTab === 'chat' ? (
+                <div className="model-list">
+                  {models.map((installedModel) => (
+                    <button
+                      className={`model-option ${selectedModel === installedModel.name ? 'selected' : ''}`}
+                      key={installedModel.name}
+                      onClick={() => {
+                        setSelectedModel(installedModel.name)
+                        setModelModalOpen(false)
+                      }}
+                    >
+                      <span className="model-option-icon"><Bot size={17} /></span>
+                      <span className="model-option-info">
+                        <strong>{installedModel.name}</strong>
+                        <small>{[installedModel.family, installedModel.size].filter(Boolean).join(' · ') || 'Instalado localmente'}</small>
+                      </span>
+                      <span className="model-option-check">{selectedModel === installedModel.name && <Check size={17} />}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="model-list">
+                  {imageModels.map((imgMod) => (
+                    <div
+                      key={imgMod.id}
+                      className={`image-model-card ${selectedImageModel === imgMod.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedImageModel(imgMod.id)
+                        localStorage.setItem(IMAGE_MODEL_STORAGE_KEY, imgMod.id)
+                        setModelModalOpen(false)
+                      }}
+                    >
+                      <div className="image-model-card-top">
+                        <div className="image-model-card-title">
+                          <Camera size={16} color={selectedImageModel === imgMod.id ? '#25d366' : '#aebac1'} />
+                          <span>{imgMod.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="image-model-badge">{imgMod.badge}</span>
+                          {selectedImageModel === imgMod.id && <Check size={16} color="#25d366" />}
+                        </div>
+                      </div>
+                      <p className="image-model-card-desc">{imgMod.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
       </main>
     )
   }
@@ -2726,7 +2906,7 @@ function App() {
           </span>
         </button>
 
-        <div className="sidebar-section" style={{ overflowY: 'auto', flex: 1, maxHeight: 'calc(100vh - 270px)' }}>
+        <div className="sidebar-section" style={{ overflowY: 'auto', flex: 1, maxHeight: 'calc(100vh - 340px)' }}>
           <span className="eyebrow">Conversas Padrão</span>
           {temporaryChat ? (
             <div className="conversation-row active temporary-row"><span className="conversation-dot" />Chat Temporário</div>
@@ -2770,11 +2950,26 @@ function App() {
           </div>
           <div className="model-caption">
             <span>{isGemini ? 'MODELO NUVEM' : 'MODELO LOCAL'}</span>
-            <button className="model-trigger" onClick={() => setModelModalOpen(true)} disabled={!models.length || loading} aria-haspopup="dialog" aria-expanded={modelModalOpen}>
+            <button className="model-trigger" onClick={() => { setModelModalTab('chat'); setModelModalOpen(true); }} disabled={!models.length || loading} aria-haspopup="dialog" aria-expanded={modelModalOpen}>
               <span>{selectedModel.split('/').pop()?.split(':')[0] || 'Carregando modelos...'}</span>
               <ChevronDown size={14} />
             </button>
             <small>{models.find((installedModel) => installedModel.name === selectedModel)?.size || (isGemini ? 'Google AI' : 'Instalado localmente')}</small>
+          </div>
+          <div className="sidebar-img-model-card">
+            <span>MODELO DE FOTOS / IMAGEM</span>
+            <button
+              className="model-trigger"
+              onClick={() => {
+                setModelModalTab('image')
+                setModelModalOpen(true)
+              }}
+              aria-haspopup="dialog"
+            >
+              <span>{imageModels.find(m => m.id === selectedImageModel)?.name?.split('(')[0]?.trim() || selectedImageModel}</span>
+              <ChevronDown size={14} />
+            </button>
+            <small>{imageModels.find(m => m.id === selectedImageModel)?.badge || 'Ultra-Realismo 2K'}</small>
           </div>
         </div>
       </aside>
@@ -2878,30 +3073,79 @@ function App() {
           <section className="model-modal" role="dialog" aria-modal="true">
             <div className="modal-heading">
               <div>
-                <span className="modal-kicker">{isGemini ? 'RUNTIME AI STUDIO' : 'RUNTIME LOCAL'}</span>
-                <h2>Escolha um modelo</h2>
+                <span className="modal-kicker">SELEÇÃO DE MODELOS</span>
+                <h2>{modelModalTab === 'image' ? 'Modelos de Geração de Fotos' : 'Modelos de Conversa (Chat)'}</h2>
+                <p>{modelModalTab === 'image' ? 'Escolha o modelo de IA para gerar fotos e selfies realistas no chat.' : 'Escolha o modelo de linguagem para processamento das mensagens.'}</p>
               </div>
               <button className="icon-button" onClick={() => setModelModalOpen(false)}><X size={18} /></button>
             </div>
-            <div className="model-list">
-              {models.map((installedModel) => (
-                <button
-                  className={`model-option ${selectedModel === installedModel.name ? 'selected' : ''}`}
-                  key={installedModel.name}
-                  onClick={() => {
-                    setSelectedModel(installedModel.name)
-                    setModelModalOpen(false)
-                  }}
-                >
-                  <span className="model-option-icon"><Bot size={17} /></span>
-                  <span className="model-option-info">
-                    <strong>{installedModel.name}</strong>
-                    <small>{[installedModel.family, installedModel.size].filter(Boolean).join(' · ') || 'Instalado localmente'}</small>
-                  </span>
-                  <span className="model-option-check">{selectedModel === installedModel.name && <Check size={17} />}</span>
-                </button>
-              ))}
+
+            <div className="model-tabs">
+              <button
+                type="button"
+                className={`model-tab-btn ${modelModalTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setModelModalTab('chat')}
+              >
+                <Bot size={15} />
+                <span>Chat / Conversa</span>
+              </button>
+              <button
+                type="button"
+                className={`model-tab-btn ${modelModalTab === 'image' ? 'active' : ''}`}
+                onClick={() => setModelModalTab('image')}
+              >
+                <Camera size={15} />
+                <span>Geração de Fotos / Imagens</span>
+              </button>
             </div>
+
+            {modelModalTab === 'chat' ? (
+              <div className="model-list">
+                {models.map((installedModel) => (
+                  <button
+                    className={`model-option ${selectedModel === installedModel.name ? 'selected' : ''}`}
+                    key={installedModel.name}
+                    onClick={() => {
+                      setSelectedModel(installedModel.name)
+                      setModelModalOpen(false)
+                    }}
+                  >
+                    <span className="model-option-icon"><Bot size={17} /></span>
+                    <span className="model-option-info">
+                      <strong>{installedModel.name}</strong>
+                      <small>{[installedModel.family, installedModel.size].filter(Boolean).join(' · ') || 'Instalado localmente'}</small>
+                    </span>
+                    <span className="model-option-check">{selectedModel === installedModel.name && <Check size={17} />}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="model-list">
+                {imageModels.map((imgMod) => (
+                  <div
+                    key={imgMod.id}
+                    className={`image-model-card ${selectedImageModel === imgMod.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedImageModel(imgMod.id)
+                      localStorage.setItem(IMAGE_MODEL_STORAGE_KEY, imgMod.id)
+                      setModelModalOpen(false)
+                    }}
+                  >
+                    <div className="image-model-card-top">
+                      <div className="image-model-card-title">
+                        <Camera size={16} color={selectedImageModel === imgMod.id ? '#25d366' : '#aebac1'} />
+                        <span>{imgMod.name}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="image-model-badge">{imgMod.badge}</span>
+                        {selectedImageModel === imgMod.id && <Check size={16} color="#25d366" />}
+                      </div>
+                    </div>
+                    <p className="image-model-card-desc">{imgMod.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       )}
