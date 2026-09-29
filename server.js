@@ -42,13 +42,12 @@ try {
   }
 } catch {}
 
-const geminiApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'
-  ? process.env.GEMINI_API_KEY
-  : null
+const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY
+const geminiApiKey = rawKey && rawKey !== 'MY_GEMINI_API_KEY' ? rawKey.trim() : null
 
-const ai = (geminiApiKey && GoogleGenAI)
+const ai = GoogleGenAI
   ? new GoogleGenAI({
-      apiKey: geminiApiKey,
+      ...(geminiApiKey ? { apiKey: geminiApiKey } : {}),
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -146,7 +145,7 @@ export const AVAILABLE_IMAGE_MODELS = [
     name: 'Gemini 3 Pro Image',
     alias: 'Nano Banana Pro',
     badge: 'Pro 2K · Ultra-Realismo',
-    description: 'Máxima fidelidade fotográfica, micro-detalhes de textura de pele e poros, iluminação ambiente natural realista e resolução 2K.',
+    description: 'Máxima fidelidade fotográfica, micro-detalhes de textura de pele e poros, iluminação ambiente natural realista e resolução 2K nativa.',
     family: 'gemini',
     resolution: '2K',
     recommended: true,
@@ -169,16 +168,6 @@ export const AVAILABLE_IMAGE_MODELS = [
     description: 'Modelo leve para geração rápida de fotos com baixo consumo de recursos.',
     family: 'gemini',
     resolution: '1K',
-    recommended: false,
-  },
-  {
-    id: 'flux',
-    name: 'Flux Realism Engine',
-    alias: 'Flux Diffusion',
-    badge: 'Flux 1024px · Fallback',
-    description: 'Modelo alternativo baseado em difusão fotográfica para estilo foto espontânea de smartphone.',
-    family: 'flux',
-    resolution: '1024px',
     recommended: false,
   },
 ]
@@ -559,27 +548,20 @@ Character Reply in chat:
       })
     }
 
-    // 2. Synthesize ultra-high quality realistic image with selected/best image generator
+    // 2. Synthesize ultra-high quality realistic image with Google Gemini Nano Banana / Imagen models
     let imageUrl = null
     let usedModel = null
 
-    const requestedImageModel = typeof request.body?.imageModel === 'string' && request.body.imageModel.trim()
+    const requestedImageModel = typeof request.body?.imageModel === 'string' && request.body.imageModel.trim() && request.body.imageModel !== 'flux'
       ? request.body.imageModel.trim()
       : 'gemini-3-pro-image'
 
-    // If user explicitly chose Flux diffusion engine
-    if (requestedImageModel === 'flux') {
-      const seed = Math.floor(Math.random() * 9999999)
-      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 420)}, authentic candid raw photograph, real human person, natural Brazilian Latina facial features, visible skin pores, authentic skin texture, natural lighting, 35mm photography, unedited photo, sharp focus, no 3D render, no CGI, no anime, no Asian bias`
-      const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
-      imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
-      usedModel = 'flux'
-    } else if (ai) {
-      // Prioritize the user's selected Gemini image model first
+    if (ai) {
+      // Prioritize the user's selected Gemini image model first, then fallback to other Gemini models
       const imageModels = [
         requestedImageModel,
-        'gemini-3-pro-image',
         'gemini-3.1-flash-image',
+        'gemini-3-pro-image',
         'gemini-3.1-flash-lite-image',
       ].filter((v, i, a) => a.indexOf(v) === i)
 
@@ -594,49 +576,44 @@ Character Reply in chat:
             },
           }
 
-          let imgRes = null
-          const multiParts = refImage
-            ? [
-                {
-                  inlineData: {
-                    mimeType: refImage.inlineData.mimeType,
-                    data: refImage.inlineData.data,
-                  },
-                },
-                {
-                  text: `Use the visual realism, natural human skin texture, visible skin pores, and camera lighting of the provided reference image (assets/ref.jpeg) as the realism baseline. Generate a new authentic raw smartphone selfie matching: ${refinedPrompt}`,
-                },
-              ]
-            : [{ text: refinedPrompt }]
+          const parts = []
+          if (refImage?.inlineData?.data) {
+            parts.push({
+              inlineData: {
+                mimeType: refImage.inlineData.mimeType || 'image/jpeg',
+                data: refImage.inlineData.data,
+              },
+            })
+          }
+          parts.push({
+            text: `Use the realism, real skin texture with visible skin pores, and natural lighting of the reference as the photorealistic baseline. Generate: ${refinedPrompt}`,
+          })
 
+          let imgRes = null
           try {
             imgRes = await ai.models.generateContent({
               model: imgModel,
               contents: {
-                parts: multiParts,
+                parts,
               },
               config: imgConfig,
             })
           } catch (multiPartErr) {
-            // If image-part input is not accepted by this specific model, seamlessly fall back to text-only with reference directives
-            if (multiParts.length > 1) {
-              imgRes = await ai.models.generateContent({
-                model: imgModel,
-                contents: {
-                  parts: [
-                    {
-                      text: `${refinedPrompt}. Reference image realism standard: authentic real human skin texture with natural pores, natural Latina facial features, documentary lighting, unedited raw smartphone photo taken on iPhone 15 Pro, 35mm lens.`,
-                    },
-                  ],
-                },
-                config: imgConfig,
-              })
-            } else {
-              throw multiPartErr
-            }
+            // Text-only direct generation with Gemini
+            imgRes = await ai.models.generateContent({
+              model: imgModel,
+              contents: {
+                parts: [
+                  {
+                    text: `${refinedPrompt}. Visual style & realism standard: authentic real human skin texture with natural pores, natural Latina facial features, documentary room lighting, unedited raw smartphone photo taken on iPhone 15 Pro, 35mm lens.`,
+                  },
+                ],
+              },
+              config: imgConfig,
+            })
           }
 
-          for (const cand of imgRes.candidates || []) {
+          for (const cand of imgRes?.candidates || []) {
             for (const part of cand.content?.parts || []) {
               if (part.inlineData && part.inlineData.data) {
                 const mime = part.inlineData.mimeType || 'image/jpeg'
@@ -659,13 +636,12 @@ Character Reply in chat:
       }
     }
 
-    // 3. Resilient fallback if Gemini is offline or rate-limited
     if (!imageUrl) {
-      const seed = Math.floor(Math.random() * 9999999)
-      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 420)}, authentic candid raw photograph, real human person, natural Brazilian Latina facial features, visible skin pores, authentic skin texture, natural ambient lighting, 35mm smartphone photography, unedited photo, sharp focus, no 3D render, no CGI, no anime, no Asian bias`
-      const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
-      imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
-      usedModel = 'flux-fallback'
+      return response.status(500).json({
+        success: false,
+        error: 'Não foi possível gerar a foto com o Gemini. Verifique a chave de API ou tente novamente.',
+        shouldGenerate: false,
+      })
     }
 
     return response.json({

@@ -90,16 +90,6 @@ export const DEFAULT_IMAGE_MODELS = [
     resolution: '1K',
     recommended: false,
   },
-  {
-    id: 'flux',
-    name: 'Flux Realism Engine',
-    alias: 'Flux Diffusion',
-    badge: 'Flux 1024px · Fallback',
-    description: 'Modelo alternativo baseado em difusão fotográfica para estilo foto espontânea de smartphone.',
-    family: 'flux',
-    resolution: '1024px',
-    recommended: false,
-  },
 ]
 
 export const INTIMACY_LEVELS = {
@@ -568,8 +558,18 @@ function loadStoredData(key, fallback) {
 }
 
 function formatTime(timestamp) {
-  const d = timestamp ? new Date(timestamp) : new Date()
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  try {
+    let d = new Date()
+    if (timestamp) {
+      const parsed = new Date(timestamp)
+      if (!isNaN(parsed.getTime())) {
+        d = parsed
+      }
+    }
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return '12:00'
+  }
 }
 
 function createConversation(messages = [standardInitialMessage], title = 'Nova conversa', isAdmin = false, character = null, isGroup = false, memberIds = [], groupName = '') {
@@ -756,7 +756,7 @@ function App() {
   const messages = activeConversation?.messages || []
   const isAdminActive = Boolean(activeConversation?.isAdmin)
   const isGroupChat = Boolean(activeConversation?.isGroup)
-  const isGemini = selectedModel.startsWith('gemini')
+  const isGemini = true;
 
   // Find active characters / members
   const groupMembers = isGroupChat
