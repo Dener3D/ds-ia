@@ -409,14 +409,14 @@ app.post('/api/generate-photo', express.json(), async (request, response) => {
       historySummary = context
     }
 
-    // 1. Analyze consent and subject with Gemini
+    // 1. Analyze consent, subject, and build high-fidelity prompt with Gemini
     let shouldGenerate = true
-    const isExplicitCharacterRequest = /(?:foto\s+sua|selfie|voc[eê]|sua\s+foto|foto\s+de\s+vc|foto\s+de\s+voc[eê]|tomando\s+banho|deitada|seu\s+rosto|seu\s+corpo)/i.test(effectiveUserRequest)
+    const isExplicitCharacterRequest = /(?:foto\s+sua|selfie|voc[eê]|sua\s+foto|foto\s+de\s+vc|foto\s+de\s+voc[eê]|tomando\s+banho|deitada|seu\s+rosto|seu\s+corpo|voc[eê]\s+aqui|como\s+voc[eê]\s+t[aá]|uma\s+foto\s+tua|manda\s+uma\s+foto)/i.test(effectiveUserRequest)
     
-    // Default photorealistic prompt
+    // Default photorealistic prompt with strict Brazilian/Latina ethnicity and human skin texture
     let refinedPrompt = isExplicitCharacterRequest
-      ? `Authentic candid raw smartphone photograph, taken with iPhone 15 Pro, 35mm lens, natural ambient lighting, candid shot of ${charName}, ${physDesc}, in ${charScenario}, looking at camera, fine natural skin pores, unedited real life photo, sharp focus. No 3D render, no CGI, no plastic skin, no doll, no videogame graphics, no digital art`
-      : `Authentic candid raw smartphone photograph, taken with iPhone 15 Pro, first-person POV shot of ${effectiveUserRequest}, in ${charScenario}, natural real-world lighting, fine textures, photorealistic documentary style, sharp focus. No 3D render, no CGI, no cartoon`
+      ? `Authentic candid raw smartphone selfie photograph, taken on an iPhone 15 Pro front camera, natural ambient room lighting, realistic shot of ${charName}, ${physDesc}, in ${charScenario}, looking at camera, authentic Brazilian Latina woman with natural Latina facial features, natural warm brown eyes with natural double eyelids, real human skin with visible fine pores and subtle natural texture, natural hair with loose strands, unedited amateur real life photo, sharp focus. No 3D render, no CGI, no porcelain doll, no smooth plastic skin, no anime, no manga, no East Asian features, no K-pop aesthetic, no digital art, no videogame graphics`
+      : `Authentic candid raw smartphone photograph, taken with an iPhone 15 Pro, first-person POV shot of ${effectiveUserRequest}, in ${charScenario}, natural real-world lighting, fine textures, photorealistic documentary style, sharp focus, unedited real life photo. No 3D render, no CGI, no cartoon, no digital illustration`
 
     if (ai) {
       const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.8-flash']
@@ -425,8 +425,8 @@ app.post('/api/generate-photo', express.json(), async (request, response) => {
           const evalRes = await ai.models.generateContent({
             model: modelName,
             config: {
-              systemInstruction: `You are an expert AI evaluator and master photography prompt engineer for a WhatsApp chat simulation.
-Analyze the user request, the character reply, and the chat history. Decide if an image should actually be generated and write the exact ultra-photorealistic prompt.
+              systemInstruction: `You are a world-class realistic photography director and prompt engineer for a WhatsApp roleplay simulation.
+Analyze the user request, the character reply, and the chat history. Decide if an image should actually be generated and write the exact ultra-photorealistic image generation prompt.
 
 CRITICAL RULES:
 1. CONSENT & WILLINGNESS CHECK:
@@ -435,15 +435,25 @@ CRITICAL RULES:
 
 2. SUBJECT IDENTIFICATION (STRICT SEPARATION):
    - OBJECT / VEHICLE / SCENERY / PLACE / FOOD / ANIMAL:
-     If the user asked for an object, car, motorcycle, room, food, view, beach, pet, street (e.g. "foto do carro", "foto da pizza", "foto do seu cachorro", "foto da praia"), the imagePrompt MUST depict ONLY that requested object/vehicle/place in first-person POV smartphone camera perspective. DO NOT include the character or any random person!
-   - CHARACTER / PERSON PHOTO:
-     ONLY when the user explicitly asked for a photo of the person/character herself/himself (e.g. "foto sua", "uma selfie sua", "foto sua agora tomando banho", "foto de você na cama"), generate a realistic photo/selfie of the character matching physical attributes (${physDesc}), age (${charAge}), and the exact situation requested (e.g. in the shower with steam, lying on bed, at work).
+     If the user asked for an object, car, motorcycle, room, food, view, beach, pet, street (e.g. "foto do carro", "foto da pizza", "foto do seu cachorro", "foto da praia"):
+     The imagePrompt MUST depict ONLY that requested object/vehicle/place in first-person POV smartphone camera perspective. DO NOT include the character or any random person!
+   - CHARACTER / PERSON SELFIE:
+     ONLY when the user explicitly asked for a photo of the person/character herself/himself (e.g. "foto sua", "uma selfie sua", "foto sua agora tomando banho", "foto de você na cama", "selfie"):
+     Generate an authentic, raw smartphone selfie of the character matching the exact physical attributes and ethnicity.
 
-3. ULTRA-PHOTOREALISM & STRICT ANTI-3D CONSTRAINTS (MANDATORY):
-   - The image MUST look like a genuine, unedited raw smartphone photo taken on an iPhone 15 Pro / Galaxy S24, NOT a 3D render, CGI, digital illustration or videogame asset.
-   - Include realistic camera photography traits: natural ambient lighting, subtle natural shadows, realistic skin texture with fine visible pores and tiny natural imperfections, authentic hair strands, candid angle, slight mobile camera lens grain, real depth of field.
-   - Prepend and append realism anchors: "Authentic candid raw smartphone photograph, 35mm lens, natural real-life lighting, ultra realistic photo, fine skin texture"
-   - STRICT NEGATIVES to prevent artificial 3D look: "no 3D render, no CGI, no plastic doll skin, no octane render, no airbrushed smooth filter, no videogame graphics, no digital illustration, no cartoon".
+3. STRICT ETHNICITY & FACIAL ATTRIBUTE FIDELITY (PREVENT ASIAN / ANIME BIAS):
+   - You MUST faithfully translate and strictly maintain the character's exact nationality and ethnicity (e.g., Brazilian Latina woman, Brazilian man, etc.).
+   - NEVER default to East Asian, Japanese, Korean, K-pop, or anime faces!
+   - DO NOT use ambiguous words like "almond eyes" which trigger Asian bias. Instead, describe: "authentic Brazilian Latina facial morphology, expressive warm dark eyes with natural double eyelids and natural lashes, natural Brazilian light-tan/olive skin tone, natural full lips, authentic Brazilian/Latina facial bone structure".
+   - Age fidelity: Exactly match the character's specified age (${charAge}) with age-appropriate natural facial characteristics (e.g. 20, 22, 23, 42, 46 years old).
+   - Hair & Physical traits: Precisely match the character's hair color, hair length, hair texture (${physDesc}), and body type.
+
+4. ULTRA-PHOTOREALISM & HUMAN SKIN TEXTURE:
+   - The photo MUST look 100% like an authentic, amateur, unedited photo taken with an iPhone 15 Pro front camera (selfie) in everyday ambient room/natural light.
+   - Genuine human skin: realistic visible micro-pores, natural skin texture, subtle natural blemishes, fine skin tone variations, natural shadows and real ambient reflections.
+   - Hair: natural real strands with slight flyaways and natural parting.
+   - Lighting: natural realistic indoor or outdoor room lighting matching the scenario (${charScenario}).
+   - NO AI SLOP / ANTI-PLASTIC MANDATE: Include explicit negative terms: "no 3D render, no CGI, no porcelain doll, no plastic skin, no airbrushing, no digital art, no videogame graphics, no anime, no manga, no East Asian features, no heavy glamour makeup filter, no fake studio backdrop".
 
 Return valid JSON with these keys:
 {
@@ -518,7 +528,7 @@ Character Reply in chat:
     // If user explicitly chose Flux diffusion engine
     if (requestedImageModel === 'flux') {
       const seed = Math.floor(Math.random() * 9999999)
-      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 380)}, raw photograph, high resolution, 35mm photography, natural lighting, highly detailed, photorealistic, candid, sharp focus`
+      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 420)}, authentic candid raw photograph, real human person, natural Brazilian Latina facial features, visible skin pores, authentic skin texture, natural lighting, 35mm photography, unedited photo, sharp focus, no 3D render, no CGI, no anime, no Asian bias`
       const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
       imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
       usedModel = 'flux'
@@ -578,7 +588,7 @@ Character Reply in chat:
     // 3. Resilient fallback if Gemini is offline or rate-limited
     if (!imageUrl) {
       const seed = Math.floor(Math.random() * 9999999)
-      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 380)}, raw photograph, high resolution, 35mm photography, natural lighting, highly detailed, photorealistic, candid, sharp focus`
+      const photorealisticCleanPrompt = `${refinedPrompt.slice(0, 420)}, authentic candid raw photograph, real human person, natural Brazilian Latina facial features, visible skin pores, authentic skin texture, natural ambient lighting, 35mm smartphone photography, unedited photo, sharp focus, no 3D render, no CGI, no anime, no Asian bias`
       const encodedPrompt = encodeURIComponent(photorealisticCleanPrompt)
       imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1024&seed=${seed}&nologo=true&model=flux`
       usedModel = 'flux-fallback'

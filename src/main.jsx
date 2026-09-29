@@ -251,7 +251,7 @@ export const DEFAULT_CHARACTERS = [
     name: 'Valentina',
     age: '22 anos',
     relationship: 'Amiga com amizade colorida',
-    physicalDescription: 'Mulher brasileira jovem de 22 anos, cabelos castanho-claros longos e ondulados, olhos amendoados castanho-mel, pele clara com leve bronzeado tropical, lábios carnudos, corpo curvilíneo e atraente, estilo moderno e provocante.',
+    physicalDescription: 'Mulher brasileira de 22 anos com traços latinos autênticos e expressivos, cabelos castanho-claros longos e ondulados naturais, olhos castanho-mel expressivos com olhar marcante e cílios naturais, pele morena-clara brasileira com textura real e viço natural, lábios carnudos naturais, corpo atraente curvilíneo e bem delineado, beleza brasileira autêntica e moderna.',
     temperament: 'Provocadora, irônica e debochada',
     mood: 'Provocativa com segundas intenções',
     resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
@@ -269,7 +269,7 @@ export const DEFAULT_CHARACTERS = [
     name: 'Larissa',
     age: '23 anos',
     relationship: 'Namorada',
-    physicalDescription: 'Mulher brasileira de 23 anos, cabelos castanho-escuros lisos e sedosos na altura dos ombros, olhos castanhos expressivos e meigos, rosto delicado e feminino, sorriso doce com covinhas sutis, corpo esbelto e bem proporcional.',
+    physicalDescription: 'Mulher brasileira de 23 anos com traços latinos delicados e naturais, cabelos castanho-escuros lisos e sedosos na altura dos ombros, grandes olhos castanhos expressivos e meigos, rosto feminino autêntico, sorriso doce natural com covinhas sutis, pele clara tropical com textura real humana, corpo esbelto e bem proporcional.',
     temperament: 'Carinhosa, fofa e apegada',
     mood: 'Carente querendo atenção e mimo',
     resistance: 'Carinhosa & Acolhedora (Doce, compreensiva e apegada)',
@@ -287,7 +287,7 @@ export const DEFAULT_CHARACTERS = [
     name: 'Letícia',
     age: '42 anos',
     relationship: 'Sogra',
-    physicalDescription: 'Mulher brasileira madura e elegante de 42 anos, cabelos castanhos médios sedosos com mechas douradas discretas, olhos castanhos marcantes e seguros, postura imponente, maquiagem sofisticada, beleza clássica e atraente de mulher madura.',
+    physicalDescription: 'Mulher brasileira madura de 42 anos com beleza latina elegante e marcante, cabelos castanhos médios sedosos com mechas douradas discretas, olhos castanhos expressivos e seguros, feições maduras e atraentes de mulher adulta real, postura imponente, maquiagem sofisticada e pele madura muito bem cuidada com textura natural.',
     temperament: 'Madura, confiante e dominadora',
     mood: 'Provocativa com segundas intenções',
     resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
@@ -305,7 +305,7 @@ export const DEFAULT_CHARACTERS = [
     name: 'Carlos',
     age: '46 anos',
     relationship: 'Padrasto',
-    physicalDescription: 'Homem brasileiro de 46 anos, cabelos curtos grisalhos nas têmporas, barba cerrada bem alinhada com alguns fios brancos, olhos castanhos firmes e sérios, porte físico robusto, estilo casual elegante.',
+    physicalDescription: 'Homem brasileiro de 46 anos com feições latinas/sul-americanas masculinas marcantes, cabelos curtos grisalhos nas têmporas, barba cerrada bem alinhada com alguns fios brancos, olhos castanhos firmes e profundos, estrutura óssea facial masculina forte, porte físico robusto, estilo casual elegante.',
     temperament: 'Autoritário, direto e protetor',
     mood: 'Curiosa querendo saber de você',
     resistance: 'Filtro Rígido / Desconfiada (Dá corte se avançar rápido ou for invasivo)',
@@ -323,7 +323,7 @@ export const DEFAULT_CHARACTERS = [
     name: 'Camila',
     age: '20 anos',
     relationship: 'Meia-irmã',
-    physicalDescription: 'Jovem brasileira de 20 anos, cabelos castanhos longos repicados e despojados, olhos castanhos brilhantes e expressivos, sorriso debochado e jovem, corpo esbelto, visual jovem moderno e descolado.',
+    physicalDescription: 'Jovem brasileira de 20 anos com traços latinos naturais e expressivos, cabelos castanhos longos repicados despojados, olhos castanhos brilhantes e vivos, sorriso debochado jovem, pele jovem natural com textura real, corpo esbelto, visual jovem moderno e descolado.',
     temperament: 'Provocadora, irônica e debochada',
     mood: 'Brava / Chateada fingindo indiferença',
     resistance: 'Filtro Rígido / Desconfiada (Dá corte se avançar rápido ou for invasivo)',
@@ -353,7 +353,7 @@ export const PRESET_PERSONAS = [
     name: 'Valentina',
     age: '22 anos',
     relationship: 'Amiga com amizade colorida',
-    physicalDescription: 'Mulher brasileira jovem de 22 anos, cabelos castanho-claros longos e ondulados, olhos amendoados castanho-mel, pele clara com leve bronzeado tropical, lábios carnudos, corpo curvilíneo e atlético.',
+    physicalDescription: 'Mulher brasileira de 22 anos com traços latinos autênticos e expressivos, cabelos castanho-claros longos e ondulados naturais, olhos castanho-mel expressivos com olhar marcante e cílios naturais, pele morena-clara brasileira com textura real e viço natural, lábios carnudos naturais, corpo atraente curvilíneo e bem delineado, beleza brasileira autêntica e moderna.',
     temperament: 'Provocadora, irônica e debochada',
     mood: 'Provocativa com segundas intenções',
     resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
@@ -372,7 +372,7 @@ export const PRESET_PERSONAS = [
     name: 'Larissa',
     age: '23 anos',
     relationship: 'Namorada',
-    physicalDescription: 'Mulher brasileira de 23 anos, cabelos castanho-escuros lisos na altura dos ombros, olhos castanhos expressivos e meigos, rosto delicado e feminino, sorriso doce com covinhas sutis, corpo esbelto.',
+    physicalDescription: 'Mulher brasileira de 23 anos com traços latinos delicados e naturais, cabelos castanho-escuros lisos e sedosos na altura dos ombros, grandes olhos castanhos expressivos e meigos, rosto feminino autêntico, sorriso doce natural com covinhas sutis, pele clara tropical com textura real humana, corpo esbelto e bem proporcional.',
     temperament: 'Carinhosa, fofa e apegada',
     mood: 'Carente querendo atenção e mimo',
     resistance: 'Carinhosa & Acolhedora (Doce, compreensiva e apegada)',
@@ -391,7 +391,7 @@ export const PRESET_PERSONAS = [
     name: 'Letícia',
     age: '42 anos',
     relationship: 'Sogra',
-    physicalDescription: 'Mulher brasileira madura e elegante de 42 anos, cabelos castanhos médios sedosos com mechas douradas discretas, olhos castanhos marcantes e seguros, postura imponente, maquiagem sofisticada, beleza clássica de mulher madura.',
+    physicalDescription: 'Mulher brasileira madura de 42 anos com beleza latina elegante e marcante, cabelos castanhos médios sedosos com mechas douradas discretas, olhos castanhos expressivos e seguros, feições maduras e atraentes de mulher adulta real, postura imponente, maquiagem sofisticada e pele madura muito bem cuidada com textura natural.',
     temperament: 'Madura, confiante e dominadora',
     mood: 'Provocativa com segundas intenções',
     resistance: 'Joguinho & Provocação (Faz charme, instiga e não entrega fácil)',
@@ -410,7 +410,7 @@ export const PRESET_PERSONAS = [
     name: 'Beatriz',
     age: '21 anos',
     relationship: 'Melhor amiga de infância',
-    physicalDescription: 'Jovem brasileira de 21 anos, cabelos castanho-claros levemente ondulados na altura dos ombros, óculos delicados de armação fina, olhos castanhos expressivos, bochechas coradas e olhar tímido e meigo.',
+    physicalDescription: 'Jovem brasileira de 21 anos com traços latinos naturais e meigos, cabelos castanho-claros levemente ondulados na altura dos ombros, óculos delicados de armação fina, olhos castanhos expressivos, bochechas coradas naturais e olhar tímido.',
     temperament: 'Tímida, envergonhada e reservada',
     mood: 'Curiosa querendo saber de você',
     resistance: 'Tímida & Envergonhada (Fica sem jeito, cora e esquiva de temas pesados)',
@@ -597,13 +597,17 @@ function loadStoredCharacters() {
   const loaded = loadStoredData(CHARACTERS_STORAGE_KEY, DEFAULT_CHARACTERS)
   return loaded.map(c => {
     const defaultMatch = DEFAULT_CHARACTERS.find(dc => dc.id === c.id || dc.name?.toLowerCase() === c.name?.toLowerCase())
+    const hasOutdatedDesc = !c.physicalDescription || c.physicalDescription.includes('amendoados') || !c.physicalDescription.includes('latin')
+    const finalDesc = (defaultMatch && hasOutdatedDesc)
+      ? defaultMatch.physicalDescription
+      : (c.physicalDescription || defaultMatch?.physicalDescription || (
+        c.name === 'Carlos'
+          ? 'Homem brasileiro de 46 anos com feições latinas/sul-americanas marcantes, cabelos curtos grisalhos nas têmporas, barba cerrada bem alinhada com alguns fios brancos, olhos castanhos firmes, porte físico robusto, estilo casual elegante.'
+          : `Mulher brasileira de ${c.age || '22 anos'} com traços latinos autênticos e expressivos, cabelos castanhos naturais bem cuidados, olhos castanhos expressivos com cílios naturais, pele brasileira com textura real humana, corpo atraente e visual autêntico.`
+      ))
     return {
       ...c,
-      physicalDescription: c.physicalDescription || defaultMatch?.physicalDescription || (
-        c.name === 'Carlos'
-          ? 'Homem brasileiro de 46 anos, cabelos curtos grisalhos nas têmporas, barba cerrada bem alinhada com alguns fios brancos, olhos castanhos firmes, porte físico robusto, estilo casual elegante.'
-          : `Mulher brasileira de ${c.age || '22 anos'}, traços faciais expressivos e naturais, cabelos castanhos ondulados bem cuidados, olhar marcante, corpo atraente e visual autêntico.`
-      )
+      physicalDescription: finalDesc
     }
   })
 }
