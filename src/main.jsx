@@ -584,20 +584,31 @@ function App() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Proactivity Timer: Automatically triggers spontaneous messages periodically (non-blocking)
+  // Proactivity Timer: Automatically triggers spontaneous messages ONLY for characters without active conversations
   useEffect(() => {
     if (!isAdminUnlocked || !proactivityEnabled || characters.length === 0) return
 
     const timer = setInterval(async () => {
-      // Pick a random character
-      const eligibleChars = characters.filter(c => c.id !== activeConversation?.characterId)
-      const targetChar = eligibleChars.length > 0 
-        ? eligibleChars[Math.floor(Math.random() * eligibleChars.length)]
-        : characters[0]
+      // Find characters that do NOT have an ongoing conversation with messages
+      const charactersWithActiveChats = new Set(
+        conversations
+          .filter(c => c.isAdmin && c.messages && c.messages.length > 0)
+          .map(c => c.characterId)
+          .filter(Boolean)
+      )
 
+      // Only pick characters that are not in an active chat and not currently open
+      const eligibleChars = characters.filter(
+        c => !charactersWithActiveChats.has(c.id) && c.id !== activeConversation?.characterId
+      )
+
+      // If all characters already have active ongoing conversations, do nothing!
+      if (eligibleChars.length === 0) return
+
+      const targetChar = eligibleChars[Math.floor(Math.random() * eligibleChars.length)]
       if (!targetChar) return
 
-      // Trigger spontaneous message
+      // Trigger spontaneous first message from this character
       try {
         const intimacyLvl = targetChar.initialIntimacy || 1
         const systemPrompt = buildAdminSystemPrompt(targetChar, intimacyLvl, interRelationships, characters)
@@ -606,7 +617,7 @@ function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: `Envie uma mensagem curta, espontânea e muito natural pelo WhatsApp para o usuário puxando papo. Lembre-se: você é ${targetChar.name}, relação: ${targetChar.relationship}, humor: ${targetChar.mood}, cenário onde você está: ${targetChar.scenario}. Pode comentar algo do seu dia ou fazer uma pergunta casual. Responda APENAS com o texto da mensagem.`,
+            prompt: `Inicie uma conversa no WhatsApp com o usuário enviando uma primeira mensagem curta, espontânea e realista. Você está na seguinte situação: (${targetChar.scenario}), seu humor é (${targetChar.mood}), relação: (${targetChar.relationship}), nível de intimidade: (${INTIMACY_LEVELS[intimacyLvl]?.short}). Responda APENAS com o texto da mensagem direta.`,
             history: [],
             model: selectedModel,
             systemPrompt,
@@ -619,13 +630,17 @@ function App() {
           setConversations(prev => {
             const existing = prev.find(c => c.characterId === targetChar.id && c.isAdmin)
             if (existing) {
+              // Only update if the existing conversation is still empty
+              if (existing.messages && existing.messages.length > 0) {
+                return prev
+              }
               return prev.map(c => {
                 if (c.id === existing.id) {
                   const isCurrent = c.id === activeConversationId
                   return {
                     ...c,
-                    messages: [...c.messages, newMsg],
-                    unreadCount: isCurrent ? 0 : (c.unreadCount || 0) + 1,
+                    messages: [newMsg],
+                    unreadCount: isCurrent ? 0 : 1,
                     updatedAt: Date.now()
                   }
                 }
@@ -644,7 +659,7 @@ function App() {
     }, 70000) // Every 70 seconds
 
     return () => clearInterval(timer)
-  }, [isAdminUnlocked, proactivityEnabled, characters, activeConversationId, interRelationships, selectedModel])
+  }, [isAdminUnlocked, proactivityEnabled, characters, conversations, activeConversationId, interRelationships, selectedModel])
 
   useEffect(() => {
     function closeOnEscape(event) {
@@ -839,8 +854,13 @@ function App() {
   async function triggerPersonaStarter(targetConvId = null, targetChar = null) {
     const convId = targetConvId || activeConversationId
     const conv = conversations.find(c => c.id === convId) || activeConversation
+    if (!conv) return
+
+    // Never overwrite a conversation that already has messages
+    if (conv.messages && conv.messages.length > 0) return
+
     const char = targetChar || characters.find(c => c.id === conv?.characterId) || conv?.personaConfig || DEFAULT_CHARACTERS[0]
-    if (loading || !conv) return
+    if (loading) return
     setLoading(true)
     setConnected(true)
 
@@ -861,7 +881,13 @@ function App() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao gerar a mensagem.')
       const firstMsg = { role: 'assistant', content: data.response, time: formatTime(Date.now()) }
-      setConversations((current) => current.map((c) => c.id === convId ? { ...c, messages: [firstMsg], updatedAt: Date.now() } : c))
+      setConversations((current) => current.map((c) => {
+        if (c.id === convId) {
+          if (c.messages && c.messages.length > 0) return c
+          return { ...c, messages: [firstMsg], updatedAt: Date.now() }
+        }
+        return c
+      }))
     } catch (error) {
       setConnected(false)
       const errorMsg = { role: 'error', content: error.message, time: formatTime(Date.now()) }
@@ -959,8 +985,23 @@ function App() {
   // Trigger manual proactivity on demand for testing
   async function triggerManualProactivity() {
     if (characters.length === 0 || loading) return
-    const char = characters[Math.floor(Math.random() * characters.length)]
-    openChatWithCharacter(char)
+
+    // Find characters without ongoing conversations with messages
+    const charactersWithActiveChats = new Set(
+      conversations
+        .filter(c => c.isAdmin && c.messages && c.messages.length > 0)
+        .map(c => c.characterId)
+        .filter(Boolean)
+    )
+
+    const eligible = characters.filter(c => !charactersWithActiveChats.has(c.id))
+    if (eligible.length > 0) {
+      const char = eligible[Math.floor(Math.random() * eligible.length)]
+      openChatWithCharacter(char)
+    } else {
+      // If all characters already have active conversations, open the directory to add or choose one
+      setCharacterDirectoryOpen(true)
+    }
   }
 
   function handleKeyDown(event) {
