@@ -616,14 +616,29 @@ function cleanSpeakerPrefix(text, speakerName = '') {
   if (!text || typeof text !== 'string') return ''
   let cleaned = text.trim()
   // 1. Remove [NAME] - or [NAME]: or [NAME]
-  cleaned = cleaned.replace(/^\[\s*[A-Za-zÀ-ÿ0-9_\s-]+\s*\]\s*[-:–—]?\s*/i, '')
+  cleaned = cleaned.replace(/^\[\s*[\p{L}\p{N}_\s-]+\s*\]\s*[-:–—]?\s*/iu, '')
   // 2. Remove NAME: at the start
-  cleaned = cleaned.replace(/^[A-Za-zÀ-ÿ0-9_]+\s*:\s*/i, '')
+  cleaned = cleaned.replace(/^[\p{L}\p{N}_]+\s*:\s*/iu, '')
   // 3. Remove Fala de NAME: or Mensagem:
-  cleaned = cleaned.replace(/^(?:Mensagem|Fala)\s+de\s+[A-Za-zÀ-ÿ0-9_]+:\s*/i, '')
+  cleaned = cleaned.replace(/^(?:Mensagem|Fala)\s+de\s+[\p{L}\p{N}_]+:\s*/iu, '')
   // 4. Remove leading hyphens or quotes left over
   cleaned = cleaned.replace(/^[-–—]\s*/, '').trim()
   return cleaned
+}
+
+function handleDownloadPhoto(url) {
+  try {
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `whatsapp-foto-${Date.now()}.jpg`
+    a.rel = 'noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } catch (err) {
+    console.warn('Download error:', err)
+  }
 }
 
 // Process photo tag extraction and generation with full conversation context and consent evaluation
@@ -2109,17 +2124,15 @@ function App() {
         {lightboxData && (
           <div className="wa-lightbox-modal" onClick={() => setLightboxData(null)}>
             <div className="wa-lightbox-header" onClick={(e) => e.stopPropagation()}>
-              <a
-                href={lightboxData.url}
-                target="_blank"
-                rel="noreferrer"
-                download="whatsapp-foto.jpg"
+              <button
+                type="button"
+                onClick={() => handleDownloadPhoto(lightboxData.url)}
                 className="icon-button"
                 style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
                 title="Baixar foto original"
               >
                 <Download size={18} />
-              </a>
+              </button>
               {lightboxData.convId && lightboxData.msgIndex !== undefined && (
                 <button
                   type="button"
@@ -2836,6 +2849,19 @@ function App() {
                 </div>
               ) : (
                 <div className="model-list">
+                  <div style={{ padding: '12px 14px', background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.35)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <img src="/assets/ref.jpeg" alt="Referência de Realismo" style={{ width: '46px', height: '46px', borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#25d366', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Sparkles size={13} />
+                        <span>Referência de Realismo (assets/ref.jpeg)</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#8696a0', marginTop: '2px', lineHeight: 1.4 }}>
+                        Guia ativo de textura de pele humana, poros, iluminação natural e realismo fotográfico.
+                      </div>
+                    </div>
+                  </div>
+
                   {imageModels.map((imgMod) => (
                     <div
                       key={imgMod.id}
@@ -3125,6 +3151,19 @@ function App() {
               </div>
             ) : (
               <div className="model-list">
+                <div style={{ padding: '12px 14px', background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.35)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <img src="/assets/ref.jpeg" alt="Referência de Realismo" style={{ width: '46px', height: '46px', borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#25d366', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Sparkles size={13} />
+                      <span>Referência de Realismo (assets/ref.jpeg)</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#8696a0', marginTop: '2px', lineHeight: 1.4 }}>
+                      Guia ativo de textura de pele humana, poros, iluminação natural e realismo fotográfico.
+                    </div>
+                  </div>
+                </div>
+
                 {imageModels.map((imgMod) => (
                   <div
                     key={imgMod.id}

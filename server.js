@@ -57,6 +57,48 @@ const ai = (geminiApiKey && GoogleGenAI)
     })
   : null
 
+app.use('/assets', express.static(path.join(root, 'assets')))
+app.use('/public/assets', express.static(path.join(root, 'public/assets')))
+
+// Helper to get realism reference image from assets/ref.jpeg
+function getReferenceImagePart() {
+  try {
+    const possiblePaths = [
+      path.join(root, 'assets', 'ref.jpeg'),
+      path.join(root, 'assets', 'ref.jpg'),
+      path.join(root, 'public', 'assets', 'ref.jpeg'),
+      path.join(root, 'src', 'assets', 'ref.jpeg'),
+    ]
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        const buffer = fs.readFileSync(p)
+        return {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: buffer.toString('base64'),
+          },
+          path: p,
+          sizeKB: (buffer.length / 1024).toFixed(1),
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Reference Image] Error reading assets/ref.jpeg:', err)
+  }
+  return null
+}
+
+app.get('/api/reference-image-info', (req, res) => {
+  const ref = getReferenceImagePart()
+  res.json({
+    exists: Boolean(ref),
+    url: ref ? '/assets/ref.jpeg' : null,
+    filename: 'ref.jpeg',
+    sizeKB: ref?.sizeKB || null,
+    description: 'Imagem de referência de realismo (assets/ref.jpeg) ativa para guiar textura de pele, iluminação e fotografia.',
+  })
+})
+
 function finalAnswer(text) {
   if (!text) return ''
   const channelFinal = text.match(/(?:<\|channel\|>|<channel>)final(?:<\|message\|>|<message>)?\s*([\s\S]*)/i)
@@ -541,6 +583,7 @@ Character Reply in chat:
         'gemini-3.1-flash-lite-image',
       ].filter((v, i, a) => a.indexOf(v) === i)
 
+      const refImage = getReferenceImagePart()
       for (const imgModel of imageModels) {
         try {
           const isProOrFlash = imgModel === 'gemini-3-pro-image' || imgModel === 'gemini-3.1-flash-image'
@@ -551,23 +594,54 @@ Character Reply in chat:
             },
           }
 
-          const imgRes = await ai.models.generateContent({
-            model: imgModel,
-            contents: {
-              parts: [
+          let imgRes = null
+          const multiParts = refImage
+            ? [
                 {
-                  text: refinedPrompt,
+                  inlineData: {
+                    mimeType: refImage.inlineData.mimeType,
+                    data: refImage.inlineData.data,
+                  },
                 },
-              ],
-            },
-            config: imgConfig,
-          })
+                {
+                  text: `Use the visual realism, natural human skin texture, visible skin pores, and camera lighting of the provided reference image (assets/ref.jpeg) as the realism baseline. Generate a new authentic raw smartphone selfie matching: ${refinedPrompt}`,
+                },
+              ]
+            : [{ text: refinedPrompt }]
+
+          try {
+            imgRes = await ai.models.generateContent({
+              model: imgModel,
+              contents: {
+                parts: multiParts,
+              },
+              config: imgConfig,
+            })
+          } catch (multiPartErr) {
+            // If image-part input is not accepted by this specific model, seamlessly fall back to text-only with reference directives
+            if (multiParts.length > 1) {
+              imgRes = await ai.models.generateContent({
+                model: imgModel,
+                contents: {
+                  parts: [
+                    {
+                      text: `${refinedPrompt}. Reference image realism standard: authentic real human skin texture with natural pores, natural Latina facial features, documentary lighting, unedited raw smartphone photo taken on iPhone 15 Pro, 35mm lens.`,
+                    },
+                  ],
+                },
+                config: imgConfig,
+              })
+            } else {
+              throw multiPartErr
+            }
+          }
 
           for (const cand of imgRes.candidates || []) {
             for (const part of cand.content?.parts || []) {
               if (part.inlineData && part.inlineData.data) {
                 const mime = part.inlineData.mimeType || 'image/jpeg'
-                imageUrl = `data:${mime};base64,${part.inlineData.data}`
+                const cleanBase64 = String(part.inlineData.data).replace(/\s+/g, '').trim()
+                imageUrl = `data:${mime};base64,${cleanBase64}`
                 usedModel = imgModel
                 break
               }
