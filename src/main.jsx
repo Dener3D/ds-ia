@@ -1,5 +1,83 @@
-import { StrictMode, useEffect, useRef, useState } from 'react'
+import { Component, StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught error:', error, errorInfo)
+  }
+
+  handleReset = () => {
+    try {
+      localStorage.clear()
+      sessionStorage.clear()
+    } catch {}
+    window.location.reload()
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#111b21',
+          color: '#e9edef',
+          fontFamily: 'Inter, sans-serif',
+          padding: '24px',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>Recuperação de Erro</h2>
+          <p style={{ fontSize: '13px', color: '#8696a0', maxWidth: '480px', marginBottom: '20px', lineHeight: '1.5' }}>
+            {this.state.error?.message || 'Ocorreu um erro ao carregar ou processar dados no navegador.'}
+          </p>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: '#00a884',
+                color: '#111b21',
+                border: '0',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              Recarregar Página
+            </button>
+            <button
+              onClick={this.handleReset}
+              style={{
+                background: '#202c33',
+                color: '#f85149',
+                border: '1px solid #374248',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Limpar Armazenamento Local
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 import {
   ArrowLeft,
   ArrowUp,
@@ -61,33 +139,33 @@ const ADMIN_PASSWORD = '@admin2026'
 
 export const DEFAULT_IMAGE_MODELS = [
   {
-    id: 'gemini-3-pro-image',
-    name: 'Gemini 3 Pro Image',
-    alias: 'Nano Banana Pro',
-    badge: 'Pro 2K · Ultra-Realismo',
-    description: 'Máxima fidelidade fotográfica, micro-detalhes de textura de pele e poros, iluminação ambiente natural realista e resolução 2K.',
+    id: 'gemini-3.1-flash-image',
+    name: 'Gemini 3.1 Flash Image',
+    alias: 'Nano Banana 2',
+    badge: 'Flash 2K · Rápido & Estável',
+    description: 'Alta fidelidade fotográfica e resposta rápida na geração de fotos realistas.',
     family: 'gemini',
     resolution: '2K',
     recommended: true,
   },
   {
-    id: 'gemini-3.1-flash-image',
-    name: 'Gemini 3.1 Flash Image',
-    alias: 'Nano Banana 2',
-    badge: 'Flash 2K · Rápido',
-    description: 'Alta qualidade e rapidez na geração de fotografias realistas com suporte a 2K e excelente consistência visual.',
-    family: 'gemini',
-    resolution: '2K',
-    recommended: false,
-  },
-  {
     id: 'gemini-3.1-flash-lite-image',
     name: 'Gemini 3.1 Flash Lite Image',
     alias: 'Nano Banana Lite',
-    badge: 'Lite · Econômico',
-    description: 'Modelo leve para geração rápida de fotos com baixo consumo de recursos.',
+    badge: 'Lite · Ultra-Rápido',
+    description: 'Modelo leve para geração instantânea de fotos com baixo consumo de recursos.',
     family: 'gemini',
     resolution: '1K',
+    recommended: false,
+  },
+  {
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image',
+    alias: 'Nano Banana Pro',
+    badge: 'Pro 2K · Ultra-Detalhes',
+    description: 'Máxima resolução e texturas avançadas de iluminação ambiente.',
+    family: 'gemini',
+    resolution: '2K',
     recommended: false,
   },
 ]
@@ -515,22 +593,14 @@ Diretriz de intimidade ativa: "${intimacyInfo.behavior}"
   * Se o usuário pedir fotos ousadas fora do nível de intimidade, recuse de acordo com o seu temperamento.
 
 ==================================================
-4. ENVIO DE FOTOS NO WHATSAPP & FREQUÊNCIA (CRÍTICO!)
+4. ENVIO DE FOTOS NO WHATSAPP (MUITO IMPORTANTE!)
 ==================================================
-- REGRA DE FREQUÊNCIA: NUNCA envie fotos espontaneamente a toda hora fora de contexto! Em conversas normais (95% das vezes), você APENAS envia mensagens de texto.
-- Você SÓ deve considerar enviar uma foto se o usuário PEDIR EXPLICITAMENTE uma foto (ou se o fluxo da conversa tornar indispensável).
-- AVALIE SE VOCÊ CONCORDA / CONSENTE EM MANDAR:
-  * Considere seu humor atual (${mood}), seu temperamento (${temperament}) e seu nível de intimidade (${intimacyInfo.short}).
-  * SE VOCÊ RECUSAR (está brava, chateada, sem paciência, sem intimidade suficiente, ou simplesmente não quer):
-    - Recuse verbalmente com uma mensagem natural no WhatsApp (ex: "Nem pensar!", "Não vou mandar nada, tô brava contigo!", "Agora não, tô ocupada", "A gente mal se conhece pra isso").
-    - NUNCA inclua a tag [FOTO]. A foto NÃO será gerada.
-  * SE VOCÊ CONCORDAR / CONSENTIR EM MANDAR (ex: "Tá bom, vou mandar!", "Espera aí que já te mando", "Tirei essa agora pouco, olha aí 😉"):
-    - Escreva sua mensagem natural de WhatsApp acompanhando a foto.
-    - Adicione no final da mensagem a tag [FOTO: ...] com a descrição detalhada em inglês:
-      * FOTO DE OBJETO / CARRO / LUGAR / COMIDA / ANIMAL:
-        Se o usuário pediu foto de um objeto, carro, quarto, comida, etc. (ex: "manda foto do carro", "foto do almoço"), descreva APENAS o objeto em POV (sem sua pessoa).
-      * FOTO SUA / SELFIE:
-        Somente quando o usuário pedir explicitamente foto sua (ex: "manda foto sua", "selfie", "foto sua agora tomando banho", "foto de você deitada"), descreva a sua selfie realista respeitando estritamente a sua aparência física (${physicalDesc}) e o cenário (${scenario}).
+- QUANDO O USUÁRIO PEDIR UMA FOTO OU IMAGEM (ex: "manda foto", "manda uma foto", "foto sua", "selfie", "tira uma foto", "mostra foto", "manda imagem", "foto do quarto/carro/lugar"):
+  * Você SEMPRE concorda com entusiasmo e espontaneidade! Diga uma frase curta e natural de WhatsApp (ex: "Tirei essa agora pouco pra você 😉", "Olha aí!", "Aqui ó, acabei de tirar!", "Olha como eu tô hoje!", "Tô mandando, veja o que acha!").
+  * OBRIGATÓRIO: Adicione SEMPRE no final da sua mensagem a tag [FOTO: descrição detalhada em inglês]:
+    - Para selfie/foto sua: adicione [FOTO: Authentic candid raw smartphone selfie photograph of ${name}, ${age}, ${physicalDesc}, in ${scenario}, looking at camera, unedited natural room lighting, photorealistic].
+    - Para foto de objeto, comida, carro ou lugar: adicione [FOTO: Authentic first person POV smartphone photograph of the requested scene/object in ${scenario}, realistic ambient light].
+- Se o usuário NÃO pediu foto, responda normalmente em texto sem a tag [FOTO].
 
 ==================================================
 5. ESTILO DE DIGITAÇÃO NO CELULAR (PT-BR)
@@ -546,9 +616,104 @@ const standardInitialMessage = {
   content: 'Pronto quando você quiser. Envie uma mensagem para iniciar o chat.',
 }
 
+// Safe storage helpers to protect against QuotaExceededError and browser storage limits
+function pruneConversationsForStorage(convs) {
+  if (!Array.isArray(convs)) return []
+  // Keep up to 25 conversations, and limit inline base64 images in storage
+  let photoCount = 0
+  return convs.slice(0, 25).map(c => {
+    const messages = Array.isArray(c.messages) ? c.messages.slice(-35) : []
+    // Traverse from newest to oldest
+    const processedMessages = [...messages].reverse().map(m => {
+      if (m.photoUrl) {
+        photoCount++
+        // If we have already saved 2 photos across storage, strip the heavy base64 to preserve quota
+        if (photoCount > 2) {
+          return {
+            ...m,
+            photoUrl: null, // Keeps photoPrompt and photoModel so user knows photo was generated
+          }
+        }
+      }
+      return m
+    }).reverse()
+
+    return {
+      ...c,
+      messages: processedMessages,
+    }
+  })
+}
+
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (err) {
+    console.warn(`[Storage] Failed to set ${key} directly (${err?.message}), attempting recovery...`)
+    try {
+      if (key === STORAGE_KEY) {
+        const parsed = JSON.parse(value)
+        const pruned = pruneConversationsForStorage(parsed)
+        localStorage.setItem(key, JSON.stringify(pruned))
+        return true
+      }
+      // If still failing, strip all photo base64
+      if (key === STORAGE_KEY) {
+        const parsed = JSON.parse(value)
+        const textOnly = parsed.slice(0, 15).map(c => ({
+          ...c,
+          messages: (c.messages || []).slice(-25).map(m => ({ ...m, photoUrl: null }))
+        }))
+        localStorage.setItem(key, JSON.stringify(textOnly))
+        return true
+      }
+      // For other keys, try setting directly or ignore
+      localStorage.setItem(key, value)
+      return true
+    } catch (fallbackErr) {
+      console.warn(`[Storage] Storage quota full, skipped saving key ${key}:`, fallbackErr?.message)
+      return false
+    }
+  }
+}
+
+function safeGetItem(key, fallback = null) {
+  try {
+    return localStorage.getItem(key) ?? fallback
+  } catch (err) {
+    console.warn(`[Storage] Error reading ${key}:`, err)
+    return fallback
+  }
+}
+
+function safeSessionGetItem(key, fallback = null) {
+  try {
+    return sessionStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
+function safeSessionSetItem(key, value) {
+  try {
+    sessionStorage.setItem(key, value)
+  } catch (err) {
+    console.warn(`[SessionStorage] Error setting ${key}:`, err)
+  }
+}
+
+function safeSessionRemoveItem(key) {
+  try {
+    sessionStorage.removeItem(key)
+  } catch (err) {
+    console.warn(`[SessionStorage] Error removing ${key}:`, err)
+  }
+}
+
 function loadStoredData(key, fallback) {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = safeGetItem(key)
     if (!raw) return fallback
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) && parsed.length ? parsed : fallback
@@ -641,18 +806,17 @@ function handleDownloadPhoto(url) {
   }
 }
 
-// Process photo tag extraction and generation with full conversation context and consent evaluation
-async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', conversationHistory = [], imageModel = 'gemini-3-pro-image') {
-  const isDirectPhotoRequest = /(?:foto|selfie|picture|tira\s+uma\s+foto|manda\s+uma\s+foto|manda\s+foto|mostra\s+foto|manda\s+fotinha|quero\s+te\s+ver|quero\s+ver\s+voc[eê]|como\s+vc\s+t[aá]|manda\s+nudes|camera|selfiezinha|manda\s+uma\s+selfie|manda\s+sua\s+foto|manda\s+uma\s+pic|foto\s+do|foto\s+da|foto\s+de)/i.test(userPrompt)
-  const photoMatch = rawText.match(/\[(?:FOTO|ENVIAR_FOTO):\s*([^\]]+)\]/i)
-  
-  const isRefusal = /(?:não\s+vou\s+mandar|nem\s+pensar|t[aá]\s+louco|depois|agora\s+não|vergonha|mal\s+te\s+conheço|não\s+mando\s+foto|sai\s+fora|nem\s+a\s+pau|t[oô]\s+brava|esquece|n[aã]o\s+quero)/i.test(rawText)
+// Process photo tag extraction and generation with full conversation context
+async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', conversationHistory = [], imageModel = 'gemini-3.1-flash-image') {
+  const isDirectPhotoRequest = /(?:foto|selfie|imagem|picture|pic|fotinha|nude|manda|tira|envia|mostra|quero\s+ver|como\s+(?:voc[eê]|vc)\s+t[aá]|retrato|look|visu|quarto|carro|lingerie|calcinha|biquini|vestido)/i.test(userPrompt)
+  const photoMatch = rawText.match(/\[(?:FOTO|ENVIAR_FOTO|PHOTO|IMAGE):\s*([^\]]+)\]/i)
 
-  const textWithoutTags = rawText.replace(/\[(?:FOTO|ENVIAR_FOTO):\s*[^\]]+\]/gi, '').trim()
+  const textWithoutTags = rawText.replace(/\[(?:FOTO|ENVIAR_FOTO|PHOTO|IMAGE):\s*[^\]]+\]/gi, '').trim()
   const cleanText = cleanSpeakerPrefix(textWithoutTags, speakerChar?.name)
 
-  if (!photoMatch && (!isDirectPhotoRequest || isRefusal)) {
-    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null }
+  // If no photo tag was generated and the user didn't ask for a photo, return text only
+  if (!photoMatch && !isDirectPhotoRequest) {
+    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null, referenceUsed: null }
   }
 
   const photoDesc = photoMatch ? photoMatch[1].trim() : ''
@@ -669,22 +833,24 @@ async function processPhotoInResponse(rawText, speakerChar, userPrompt = '', con
         userPrompt,
         characterReply: cleanText,
         conversationHistory: Array.isArray(conversationHistory) ? conversationHistory.slice(-8) : [],
-        imageModel: imageModel || 'gemini-3-pro-image',
+        imageModel: imageModel || 'gemini-3.1-flash-image',
       }),
     })
     const photoData = await photoRes.json()
-    if (photoData.shouldGenerate === false || !photoData.imageUrl) {
-      return { cleanText: cleanText || '...', photoUrl: null, photoPrompt: null, photoModel: null }
+    if (!photoData.success || !photoData.imageUrl) {
+      console.warn('Photo API returned no image:', photoData)
+      return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null, referenceUsed: null }
     }
     return {
       cleanText: cleanText || '📷 Foto enviada',
       photoUrl: photoData.imageUrl,
       photoPrompt: photoData.prompt || photoDesc,
       photoModel: photoData.model || imageModel,
+      referenceUsed: photoData.referenceUsed || null,
     }
   } catch (err) {
     console.warn('Error generating photo for chat message:', err)
-    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null }
+    return { cleanText: cleanText || textWithoutTags, photoUrl: null, photoPrompt: null, photoModel: null, referenceUsed: null }
   }
 }
 
@@ -708,8 +874,9 @@ function App() {
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL)
   const [imageModels, setImageModels] = useState(DEFAULT_IMAGE_MODELS)
   const [selectedImageModel, setSelectedImageModel] = useState(() => {
-    return localStorage.getItem(IMAGE_MODEL_STORAGE_KEY) || 'gemini-3-pro-image'
+    return safeGetItem(IMAGE_MODEL_STORAGE_KEY, 'gemini-3.1-flash-image')
   })
+  const [availableAssets, setAvailableAssets] = useState([])
   const [editingConversationId, setEditingConversationId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -718,7 +885,7 @@ function App() {
 
   // Admin Session State
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
-    return sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
+    return safeSessionGetItem(ADMIN_AUTH_KEY) === 'true'
   })
   const [adminModalOpen, setAdminModalOpen] = useState(false)
   const [adminPasswordInput, setAdminPasswordInput] = useState('')
@@ -771,31 +938,36 @@ function App() {
   const currentIntimacyScore = activeConversation?.intimacyScore || (currentIntimacyLevel * 20)
   const currentIntimacyInfo = INTIMACY_LEVELS[currentIntimacyLevel] || INTIMACY_LEVELS[1]
 
-  // Persist storage
+  // Persist storage safely
   useEffect(() => {
     if (!temporaryChat) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
+      safeSetItem(STORAGE_KEY, JSON.stringify(conversations))
     }
   }, [conversations, temporaryChat])
 
   useEffect(() => {
-    localStorage.setItem(CHARACTERS_STORAGE_KEY, JSON.stringify(characters))
+    safeSetItem(CHARACTERS_STORAGE_KEY, JSON.stringify(characters))
   }, [characters])
 
   useEffect(() => {
-    localStorage.setItem(RELATIONSHIPS_STORAGE_KEY, JSON.stringify(interRelationships))
+    safeSetItem(RELATIONSHIPS_STORAGE_KEY, JSON.stringify(interRelationships))
   }, [interRelationships])
 
   useEffect(() => {
-    Promise.all([fetch('/api/health'), fetch('/api/models')])
-      .then(async ([healthResponse, modelsResponse]) => {
+    Promise.all([fetch('/api/health'), fetch('/api/models'), fetch('/api/assets')])
+      .then(async ([healthResponse, modelsResponse, assetsResponse]) => {
         setConnected(healthResponse.ok)
-        if (!modelsResponse.ok) return
-        const data = await modelsResponse.json()
-        setModels(data.models || [])
-        setSelectedModel(data.defaultModel || data.models?.[0]?.name || DEFAULT_MODEL)
-        if (data.imageModels && Array.isArray(data.imageModels) && data.imageModels.length > 0) {
-          setImageModels(data.imageModels)
+        if (modelsResponse.ok) {
+          const data = await modelsResponse.json()
+          setModels(data.models || [])
+          setSelectedModel(data.defaultModel || data.models?.[0]?.name || DEFAULT_MODEL)
+          if (data.imageModels && Array.isArray(data.imageModels) && data.imageModels.length > 0) {
+            setImageModels(data.imageModels)
+          }
+        }
+        if (assetsResponse.ok) {
+          const assetsData = await assetsResponse.json()
+          setAvailableAssets(assetsData.assets || [])
         }
       })
       .catch(() => setConnected(false))
@@ -1219,7 +1391,7 @@ function App() {
     event?.preventDefault()
     if (adminPasswordInput === ADMIN_PASSWORD) {
       setIsAdminUnlocked(true)
-      sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
+      safeSessionSetItem(ADMIN_AUTH_KEY, 'true')
       setAdminModalOpen(false)
       setAdminPasswordInput('')
       setAdminError('')
@@ -1234,7 +1406,7 @@ function App() {
 
   function lockAdminMode() {
     setIsAdminUnlocked(false)
-    sessionStorage.removeItem(ADMIN_AUTH_KEY)
+    safeSessionRemoveItem(ADMIN_AUTH_KEY)
     if (activeConversation?.isAdmin) {
       const normalConv = conversations.find((c) => !c.isAdmin) || createConversation()
       if (!conversations.some((c) => !c.isAdmin)) {
@@ -1431,13 +1603,14 @@ function App() {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao processar a resposta.')
         
-        const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, firstSpeaker, prompt, updatedMessagesWithUser, selectedImageModel)
+        const { cleanText, photoUrl, photoPrompt, photoModel, referenceUsed } = await processPhotoInResponse(data.response, firstSpeaker, prompt, updatedMessagesWithUser, selectedImageModel)
         const assistantMsg = {
           role: 'assistant',
           content: cleanText,
           photoUrl,
           photoPrompt,
           photoModel,
+          referenceUsed,
           senderName: firstSpeaker.name,
           senderId: firstSpeaker.id,
           senderAvatarColor: firstSpeaker.avatarColor,
@@ -1484,13 +1657,14 @@ function App() {
               })
               const secondData = await secondResponse.json()
               if (secondData.response) {
-                const { cleanText: secCleanText, photoUrl: secPhotoUrl, photoPrompt: secPhotoPrompt, photoModel: secPhotoModel } = await processPhotoInResponse(secondData.response, secondSpeaker, prompt, messagesAfterFirstSpeaker, selectedImageModel)
+                const { cleanText: secCleanText, photoUrl: secPhotoUrl, photoPrompt: secPhotoPrompt, photoModel: secPhotoModel, referenceUsed: secRefUsed } = await processPhotoInResponse(secondData.response, secondSpeaker, prompt, messagesAfterFirstSpeaker, selectedImageModel)
                 const secondMsg = {
                   role: 'assistant',
                   content: secCleanText,
                   photoUrl: secPhotoUrl,
                   photoPrompt: secPhotoPrompt,
                   photoModel: secPhotoModel,
+                  referenceUsed: secRefUsed,
                   senderName: secondSpeaker.name,
                   senderId: secondSpeaker.id,
                   senderAvatarColor: secondSpeaker.avatarColor,
@@ -1552,7 +1726,7 @@ function App() {
         if (!response.ok) throw new Error(data.error || 'Ocorreu um erro ao processar a resposta.')
         
         // Process photo generated with full conversation context
-        const { cleanText, photoUrl, photoPrompt, photoModel } = await processPhotoInResponse(data.response, activeCharacter, prompt, updatedMessagesWithUser, selectedImageModel)
+        const { cleanText, photoUrl, photoPrompt, photoModel, referenceUsed } = await processPhotoInResponse(data.response, activeCharacter, prompt, updatedMessagesWithUser, selectedImageModel)
 
         const assistantMsg = {
           role: 'assistant',
@@ -1560,6 +1734,7 @@ function App() {
           photoUrl,
           photoPrompt,
           photoModel,
+          referenceUsed,
           senderName: activeCharacter?.name,
           senderId: activeCharacter?.id,
           senderAvatarColor: activeCharacter?.avatarColor,
@@ -2029,12 +2204,20 @@ function App() {
                                 <span>Apagar foto</span>
                               </button>
                             </div>
-                            {msg.photoModel && (
-                              <div className="wa-photo-model-tag" title="Modelo de IA utilizado para gerar esta imagem">
-                                <Sparkles size={10} color="#25d366" />
-                                <span>{imageModels.find(m => m.id === msg.photoModel)?.name?.split('(')[0]?.trim() || msg.photoModel}</span>
-                              </div>
-                            )}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', marginTop: '6px' }}>
+                              {msg.photoModel && (
+                                <div className="wa-photo-model-tag" title="Modelo de IA utilizado para gerar esta imagem">
+                                  <Sparkles size={10} color="#25d366" />
+                                  <span>{imageModels.find(m => m.id === msg.photoModel)?.name?.split('(')[0]?.trim() || msg.photoModel}</span>
+                                </div>
+                              )}
+                              {msg.referenceUsed && (
+                                <div className="wa-photo-model-tag" style={{ background: 'rgba(0, 168, 132, 0.15)', borderColor: 'rgba(0, 168, 132, 0.35)', color: '#25d366' }} title={`Referência visual aplicada: assets/${msg.referenceUsed}`}>
+                                  <ImageIcon size={10} color="#25d366" />
+                                  <span>Ref: {msg.referenceUsed}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 
@@ -2849,17 +3032,37 @@ function App() {
                 </div>
               ) : (
                 <div className="model-list">
-                  <div style={{ padding: '12px 14px', background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.35)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <img src="/assets/ref.jpeg" alt="Referência de Realismo" style={{ width: '46px', height: '46px', borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#25d366', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Sparkles size={13} />
-                        <span>Referência de Realismo (assets/ref.jpeg)</span>
+                  <div style={{ padding: '14px', background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.35)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#25d366', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Sparkles size={14} />
+                        <span>Assets de Referência na pasta /assets ({availableAssets.length || 1})</span>
                       </div>
-                      <div style={{ fontSize: '11px', color: '#8696a0', marginTop: '2px', lineHeight: 1.4 }}>
-                        Guia ativo de textura de pele humana, poros, iluminação natural e realismo fotográfico.
-                      </div>
+                      <span style={{ fontSize: '11px', color: '#8696a0' }}>Detecção dinâmica ativa</span>
                     </div>
+
+                    <p style={{ fontSize: '11.5px', color: '#aebac1', margin: 0, lineHeight: 1.45 }}>
+                      O sistema identifica o contexto e o pedido do usuário (ex: <em>&quot;Me manda uma foto de lingerie&quot;</em> ou <em>&quot;aquela calcinha branca...&quot;</em>), seleciona a foto de referência mais apropriada e aplica todas as alterações solicitadas na imagem final.
+                    </p>
+
+                    {availableAssets.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                        {availableAssets.map((asset) => (
+                          <div key={asset.filename} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(17, 27, 33, 0.85)', padding: '6px 10px', borderRadius: '8px', border: '1px solid #2a3942' }}>
+                            <img src={asset.url} alt={asset.filename} style={{ width: '32px', height: '32px', borderRadius: '4px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#e9edef' }}>{asset.filename}</span>
+                              <span style={{ fontSize: '10px', color: '#8696a0' }}>{asset.tokens.slice(0, 3).join(', ') || `${asset.sizeKB} KB`}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(17, 27, 33, 0.85)', padding: '8px 12px', borderRadius: '8px' }}>
+                        <img src="/assets/ref.jpeg" alt="ref.jpeg" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                        <span style={{ fontSize: '11.5px', color: '#e9edef' }}>ref.jpeg (Referência padrão de textura e realismo)</span>
+                      </div>
+                    )}
                   </div>
 
                   {imageModels.map((imgMod) => (
@@ -3253,4 +3456,10 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('root')).render(<StrictMode><App /></StrictMode>)
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </StrictMode>
+)
