@@ -669,13 +669,195 @@ app.post('/api/chat', async (request, response) => {
   })
 })
 
+// Helper to translate and sanitize character descriptors to English
+function getEnglishCharacterDetails(character, scenario) {
+  const name = character?.name || 'Character'
+  
+  // Clean age (e.g., '23 anos' -> '23-year-old')
+  const rawAge = (character?.age || '22 anos').toLowerCase()
+  const ageMatch = rawAge.match(/\d+/)
+  const ageEn = ageMatch ? `${ageMatch[0]}-year-old` : '22-year-old'
+
+  // English physical description
+  let physDescEn = character?.physicalDescriptionEn || ''
+  if (!physDescEn) {
+    const rawDesc = character?.physicalDescription || ''
+    if (name.toLowerCase().includes('larissa')) {
+      physDescEn = 'Brazilian woman with delicate natural Latin facial features, silky shoulder-length straight dark brown hair, large expressive warm brown eyes, sweet natural smile with subtle dimples, fair tropical skin with real pores and texture, slender well-proportioned body'
+    } else if (name.toLowerCase().includes('valentina')) {
+      physDescEn = 'Brazilian woman with authentic Latin features, long wavy natural light brown hair, warm expressive honey-brown eyes, natural lashes, glowing light-tan skin with authentic human texture, soft full lips, attractive hourglass figure'
+    } else if (name.toLowerCase().includes('letícia') || name.toLowerCase().includes('leticia')) {
+      physDescEn = 'Mature 42-year-old Brazilian woman with sophisticated Latin beauty, shoulder-length silky brown hair with discreet golden highlights, confident expressive brown eyes, attractive mature facial features, poised posture, glowing well-cared mature skin with natural texture'
+    } else if (name.toLowerCase().includes('carlos')) {
+      physDescEn = '46-year-old Brazilian man with distinguished masculine South American facial features, short dark hair graying at the temples, a neat well-groomed stubble beard with slight gray strands, firm deep brown eyes, strong masculine jawline, robust build'
+    } else if (name.toLowerCase().includes('camila')) {
+      physDescEn = 'Youthful 20-year-old Brazilian woman with lively natural Latin features, layered long brown hair, bright sparkling brown eyes, playful youthful expression, natural fresh skin texture, slender body'
+    } else if (name.toLowerCase().includes('beatriz')) {
+      physDescEn = 'Charming 21-year-old Brazilian woman with sweet natural Latin features, shoulder-length soft wavy light brown hair, delicate thin-rimmed glasses, expressive brown eyes, subtle natural blushing cheeks'
+    } else {
+      physDescEn = rawDesc
+        .replace(/mulher brasileira de (\d+) anos/gi, '$1-year-old Brazilian woman')
+        .replace(/mulher brasileira/gi, 'Brazilian woman')
+        .replace(/homem brasileiro/gi, 'Brazilian man')
+        .replace(/traços latinos/gi, 'natural Latin features')
+        .replace(/cabelos castanho-escuros/gi, 'dark brown hair')
+        .replace(/cabelos castanho-claros/gi, 'light brown hair')
+        .replace(/cabelos castanhos/gi, 'brown hair')
+        .replace(/olhos castanhos/gi, 'brown eyes')
+        .replace(/pele morena-clara/gi, 'light-tan Brazilian skin')
+        .replace(/pele clara tropical/gi, 'fair tropical skin')
+        .replace(/pele madura/gi, 'mature skin')
+        .replace(/textura real humana/gi, 'real human skin texture')
+        .replace(/corpo esbelto/gi, 'slender figure')
+        .replace(/corpo curvilíneo/gi, 'curvaceous figure')
+        .replace(/com covinhas sutis/gi, 'with subtle dimples')
+        .replace(/sorriso doce natural/gi, 'sweet natural smile')
+        || 'Brazilian woman, natural beauty, expressive brown eyes, realistic skin texture'
+    }
+  }
+
+  // English scenario
+  let scenarioEn = character?.scenarioEn || ''
+  if (!scenarioEn) {
+    const rawScen = (scenario || character?.scenario || '').toLowerCase()
+    if (rawScen.includes('cama') || rawScen.includes('quarto') || rawScen.includes('deitada')) {
+      scenarioEn = 'relaxing in a cozy bedroom at night with soft ambient lighting'
+    } else if (rawScen.includes('banho') || rawScen.includes('toalha') || rawScen.includes('chuveiro')) {
+      scenarioEn = 'in the bathroom after a warm shower with a towel'
+    } else if (rawScen.includes('sofa') || rawScen.includes('sofá') || rawScen.includes('vinho') || rawScen.includes('sala')) {
+      scenarioEn = 'relaxing on a living room sofa with a glass of wine under warm ambient lights'
+    } else if (rawScen.includes('trabalho') || rawScen.includes('faculdade') || rawScen.includes('escritorio') || rawScen.includes('escritório')) {
+      scenarioEn = 'sitting at a modern desk with ambient indoor lighting'
+    } else if (rawScen.includes('carro') || rawScen.includes('uber') || rawScen.includes('transito') || rawScen.includes('trânsito')) {
+      scenarioEn = 'sitting inside a modern car with city lights through the window'
+    } else if (rawScen.includes('praia') || rawScen.includes('piscina') || rawScen.includes('sol')) {
+      scenarioEn = 'at a sunny tropical beach under bright golden sunlight'
+    } else if (rawScen.includes('academia') || rawScen.includes('treino') || rawScen.includes('fitness')) {
+      scenarioEn = 'inside a modern fitness gym with athletic workout equipment'
+    } else {
+      scenarioEn = 'in a comfortable indoor room with warm natural lighting'
+    }
+  }
+
+  return { name, ageEn, physDescEn, scenarioEn }
+}
+
+// Clean and extract visual intentions (clothing, pose, action) from Portuguese user requests
+function extractVisualDetailsFromRequest(userText) {
+  const text = (userText || '').toLowerCase()
+  const extracted = {
+    attire: '',
+    action: '',
+    cameraAngle: 'candid front-camera smartphone selfie',
+  }
+
+  // Attire / Clothing extraction & translation
+  if (text.includes('lingerie') || text.includes('calcinha') || text.includes('sutia') || text.includes('sutiã')) {
+    if (text.includes('vermelh')) extracted.attire = 'wearing sexy red lace lingerie'
+    else if (text.includes('branc')) extracted.attire = 'wearing delicate white lace lingerie'
+    else if (text.includes('pret')) extracted.attire = 'wearing elegant black satin lace lingerie'
+    else if (text.includes('ros')) extracted.attire = 'wearing sweet pink lace lingerie'
+    else if (text.includes('azul')) extracted.attire = 'wearing seductive royal blue lingerie'
+    else extracted.attire = 'wearing alluring sexy lace lingerie'
+  } else if (text.includes('biquini') || text.includes('biquíni') || text.includes('maio') || text.includes('maiô')) {
+    if (text.includes('pret')) extracted.attire = 'wearing a stylish black bikini'
+    else if (text.includes('branc')) extracted.attire = 'wearing a chic white bikini'
+    else if (text.includes('vermelh')) extracted.attire = 'wearing a vibrant red bikini'
+    else extracted.attire = 'wearing a flattering beach bikini'
+  } else if (text.includes('vestido')) {
+    if (text.includes('vermelh')) extracted.attire = 'wearing an elegant tight red dress'
+    else if (text.includes('pret')) extracted.attire = 'wearing a chic black party dress'
+    else if (text.includes('curto') || text.includes('decot')) extracted.attire = 'wearing a stylish fitted mini dress'
+    else extracted.attire = 'wearing an elegant stylish dress'
+  } else if (text.includes('pijama') || text.includes('camisola') || text.includes('baby doll') || text.includes('babydoll')) {
+    extracted.attire = 'wearing cute comfortable silky nightwear'
+  } else if (text.includes('toalha') || text.includes('banho')) {
+    extracted.attire = 'wrapped in a fluffy white bath towel with slightly damp hair'
+  } else if (text.includes('academia') || text.includes('legging') || text.includes('top')) {
+    extracted.attire = 'wearing a fitted athletic workout sports top and leggings'
+  } else if (text.includes('nude') || text.includes('sem roupa') || text.includes('pelad')) {
+    extracted.attire = 'in an intimate sensual bedroom pose wearing delicate sheer silk lace'
+  }
+
+  // Action / Pose extraction
+  if (text.includes('deitada') || text.includes('na cama')) {
+    extracted.action = 'lying comfortably on her bed, resting head against the pillow, looking affectionately at camera'
+  } else if (text.includes('espelho') || text.includes('corpo todo') || text.includes('inteira') || text.includes('de pe') || text.includes('de pé')) {
+    extracted.action = 'standing in front of a mirror taking a full-length casual mirror selfie'
+    extracted.cameraAngle = 'full-length smartphone mirror selfie'
+  } else if (text.includes('sorr')) {
+    extracted.action = 'smiling warmly with a sweet, genuine expression'
+  } else if (text.includes('piscina') || text.includes('praia')) {
+    extracted.action = 'relaxing by the water enjoying the warm sunshine'
+  }
+
+  return extracted
+}
+
+// Synthesize cohesive 100% English photographic prompt
+async function synthesizePhotorealisticPrompt({ userPrompt, rawPromptTag, character, scenario, characterReply, conversationHistory, aiClient }) {
+  const { name, ageEn, physDescEn, scenarioEn } = getEnglishCharacterDetails(character, scenario)
+  const visualDetails = extractVisualDetailsFromRequest(userPrompt)
+
+  // Build baseline fallback prompt (100% English, no quotes, no Portuguese)
+  const attireClause = visualDetails.attire ? `, ${visualDetails.attire}` : ''
+  const actionClause = visualDetails.action ? `, ${visualDetails.action}` : ', looking naturally at the camera with a gentle expression'
+  
+  let fallbackPrompt = `Authentic candid raw smartphone photograph, shot on iPhone 15 Pro front camera, natural ambient lighting, photorealistic shot of ${name}, a ${ageEn} ${physDescEn}${attireClause}${actionClause}, in ${scenarioEn}, authentic Brazilian Latina facial morphology, natural human skin texture with fine visible pores and realistic sheen, loose natural hair strands, unedited amateur real life photo, sharp focus, 35mm lens, depth of field. No 3D render, no CGI, no porcelain doll, no smooth plastic skin, no anime, no digital painting.`
+
+  // If AI client is available, use Gemini to produce a masterfully crafted, 100% pure English prompt
+  if (aiClient) {
+    try {
+      const cleanHistory = Array.isArray(conversationHistory)
+        ? conversationHistory.slice(-6).map(m => `${m.role === 'user' ? 'User' : (m.senderName || name)}: ${m.content}`).join('\n')
+        : ''
+
+      const synthRes = await aiClient.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        config: {
+          systemInstruction: `You are an elite photorealistic prompt engineer for cutting-edge text-to-image AI models (Gemini Flash Image / Imagen).
+Your objective is to generate a SINGLE, cohesive, 100% PURE ENGLISH photographic prompt describing a realistic smartphone picture of the character.
+
+ABSOLUTE STRICT RULES:
+1. 100% PURE ENGLISH ONLY: Never include ANY Portuguese words, Portuguese numbers, or mixed-language snippets (e.g. NEVER use 'anos', 'quarto', 'calcinha', 'sutiã', 'morena', 'deitada', etc.). Translate everything to precise English photography terms.
+2. NO RAW USER QUOTES OR CONVERSATIONAL TEXT: NEVER dump the user's chat message, questions, or conversational requests (e.g. NEVER write "Pode me mandar uma foto sua...", "manda foto", "como você tá", etc.). Instead, extract the visual intent: clothing style/color (e.g. "wearing sexy black lace lingerie"), pose (e.g. "lying relaxed on a cozy bed"), angle ("candid smartphone selfie shot on iPhone 15 Pro"), lighting ("warm soft bedroom lighting"), and expression.
+3. CHARACTER FIDELITY: Maintain character identity (${name}, ${ageEn}, ${physDescEn}). Ensure authentic Brazilian/Latina facial features, real human skin with natural pores and subtle sheen, and realistic human proportions.
+4. MAXIMUM REALISM: Specify candid amateur iPhone camera aesthetics, natural ambient room lighting, authentic visible skin pores, unedited real-life look, sharp focus. NEVER mention cartoon, 3D render, anime, CGI, porcelain skin, or digital art.
+5. CLEAN OUTPUT: Return ONLY the final prompt string in English. No introductory text, no markdown formatting, no quotation marks.`,
+          temperature: 0.15,
+        },
+        contents: `Character Data:
+- Name: ${name}
+- Age: ${ageEn}
+- Physical Description: ${physDescEn}
+- Current Scenario: ${scenarioEn}
+
+User Request in Chat (Portuguese): "${userPrompt || ''}"
+Character's Chat Reply: "${characterReply || ''}"
+Recent Chat Context:
+${cleanHistory}
+
+Draft Tag (if any): "${rawPromptTag || ''}"
+
+Generated 100% English Photorealistic Prompt:`,
+      })
+
+      const generated = synthRes.text?.trim().replace(/^["']|["']$/g, '').trim()
+      // Verify generated text is clean English and not an error or Portuguese string
+      if (generated && generated.length > 30 && !generated.startsWith('{') && !/(?:anos|voc[eê]|foto\s+sua|pode\s+me|manda)/i.test(generated)) {
+        return generated
+      }
+    } catch (llmErr) {
+      console.warn('[Prompt Synthesizer] LLM synthesis fallback to rule-based prompt:', llmErr?.message || llmErr)
+    }
+  }
+
+  return fallbackPrompt
+}
+
 app.post('/api/generate-photo', express.json(), async (request, response) => {
   try {
     const { prompt, character, scenario, context, userPrompt, characterReply, conversationHistory } = request.body || {}
-    const charName = character?.name || 'Personagem'
-    const charAge = character?.age || '22 anos'
-    const physDesc = character?.physicalDescription || 'Brazilian woman, natural beauty, expressive dark eyes, attractive, realistic look'
-    const charScenario = scenario || character?.scenario || 'quarto aconchegante relaxando'
     const effectiveUserRequest = userPrompt || prompt || context || 'Manda uma foto'
 
     let historySummary = ''
@@ -700,7 +882,7 @@ app.post('/api/generate-photo', express.json(), async (request, response) => {
     const matchedRef = await findBestReferenceImage(
       `${historySummary} ${characterReply || ''}`,
       effectiveUserRequest,
-      charScenario,
+      scenario || character?.scenario,
       ai
     )
 
@@ -710,40 +892,18 @@ app.post('/api/generate-photo', express.json(), async (request, response) => {
       console.log(`[Reference Match] No reference image found in assets folder, generating purely from prompt.`)
     }
 
-    // 2. Build refined prompt with user-requested modifications
-    let refinedPrompt = ''
-    const isExplicitCharacterRequest = !prompt && /(?:foto\s+sua|selfie|voc[eê]|sua\s+foto|foto\s+de\s+vc|foto\s+de\s+voc[eê]|tomando\s+banho|deitada|seu\s+rosto|seu\s+corpo|voc[eê]\s+aqui|como\s+voc[eê]\s+t[aá]|uma\s+foto\s+tua|manda\s+uma\s+foto|manda\s+foto|quero\s+ver|look|roupa|lingerie|calcinha|biquini|vestido|quarto)/i.test(effectiveUserRequest)
-    
-    if (prompt && prompt.trim().length > 15) {
-      refinedPrompt = `Authentic candid raw smartphone photograph, taken with an iPhone 15 Pro, natural ambient lighting, unedited real life amateur photo, sharp focus: ${prompt.trim()}`
-    } else if (isExplicitCharacterRequest) {
-      refinedPrompt = `Authentic candid raw smartphone selfie photograph, taken on an iPhone 15 Pro front camera, natural ambient room lighting, realistic shot of ${charName}, ${charAge}, ${physDesc}, in ${charScenario}, looking at camera, authentic Brazilian Latina woman with natural Latina facial features, natural warm brown eyes, real human skin with visible fine pores and subtle natural texture, natural hair with loose strands, unedited amateur real life photo, sharp focus. No 3D render, no CGI, no porcelain doll, no smooth plastic skin, no anime, no manga, no East Asian features, no digital art, no videogame graphics`
-    } else {
-      refinedPrompt = `Authentic candid raw smartphone photograph, taken with an iPhone 15 Pro, first-person POV shot of ${effectiveUserRequest}, in ${charScenario}, natural real-world lighting, fine textures, photorealistic documentary style, sharp focus, unedited real life photo. No 3D render, no CGI, no cartoon, no digital illustration`
-    }
+    // 2. Synthesize a pristine, 100% PURE ENGLISH photographic prompt (no Portuguese, no raw quotes)
+    const refinedPrompt = await synthesizePhotorealisticPrompt({
+      userPrompt: effectiveUserRequest,
+      rawPromptTag: prompt,
+      character,
+      scenario,
+      characterReply,
+      conversationHistory,
+      aiClient: ai,
+    })
 
-    // Try fast prompt enhancement with context awareness
-    try {
-      const evalRes = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
-        config: {
-          systemInstruction: `You are an expert realistic photography director. Convert the photo request for character (${charName}, ${charAge}, ${physDesc}, in scenario "${charScenario}") into a single ultra-detailed photorealistic iPhone camera prompt in English.
-CRITICAL RULES:
-1. STRICT USER SPECIFICATIONS & OVERRIDES: If the user requested specific clothing items, specific colors (for example 'calcinha branca' -> white panties/lingerie, 'vestido vermelho' -> red dress, 'biquini preto' -> black bikini), hairstyles, or scene elements, you MUST explicitly describe those exact colors, clothing items, and details in the prompt so that any reference image's original colors are overridden.
-2. PHOTOREALISM: Keep it strictly photorealistic with real human skin pores, authentic Brazilian/Latina facial morphology, natural ambient room lighting.
-3. NEVER return cartoon, anime, 3D CGI, doll-like skin, or digital art terms.
-Return ONLY the final prompt string in English.`,
-          temperature: 0.2,
-        },
-        contents: `User photo request: "${effectiveUserRequest}".\nConversation context: "${historySummary} ${characterReply || ''}".\nScenario: "${charScenario}".\nBase guideline: "${prompt || refinedPrompt}".`,
-      })
-      const enhanced = evalRes.text?.trim()
-      if (enhanced && enhanced.length > 20 && !enhanced.startsWith('{')) {
-        refinedPrompt = enhanced
-      }
-    } catch {
-      // Keep baseline refinedPrompt
-    }
+    console.log(`[Photo Prompt Synthesized] Pure English Prompt: "${refinedPrompt}"`)
 
     // 3. Synthesize image using Google Gemini image generation models
     let imageUrl = null
@@ -771,13 +931,11 @@ Return ONLY the final prompt string in English.`,
         // Try with reference image first if available
         if (matchedRef?.inlineData?.data) {
           try {
-            const refGuidance = `[REFERENCE PHOTO INSTRUCTION:
-Use the attached reference image (${matchedRef.filename}) as a visual baseline for the pose, angle, composition, and ambient lighting.
-CRITICAL OVERRIDE & MODIFICATION INSTRUCTIONS:
-- You MUST adapt the photo to fulfill the user's specific request: "${effectiveUserRequest}".
-- If the user specified a certain color, clothing item, or alteration (e.g. "calcinha branca" / white lingerie, or different colors, outfit, or hair), you MUST generate the final image with the user's requested color and outfit, even if the reference photo has a different color or style!
-- Maintain character identity: ${charName}, ${charAge}, ${physDesc}, in ${charScenario}.
-- Style: Authentic candid raw iPhone 15 Pro photograph, realistic human skin with visible pores, natural room lighting.]
+            const refGuidance = `[REFERENCE IMAGE GUIDANCE:
+Use the attached reference photo (${matchedRef.filename}) exclusively as a baseline for facial structure, pose, composition, and ambient room lighting.
+STRICT USER OVERRIDE & PHOTOREALISM:
+- Fulfill the specific requested scene and outfit: ${refinedPrompt}
+- Style: Authentic candid smartphone photograph shot on iPhone 15 Pro, real human skin with natural pores, natural room lighting.]
 Detailed Prompt: ${refinedPrompt}`
             
             const multiRes = await ai.models.generateContent({
